@@ -4,7 +4,7 @@ import { Text, Center } from '@react-three/drei';
 // import { motion } from 'framer-motion-3d'; // Not available
 import * as THREE from 'three';
 // import { createGlowMaterial } from '../../../utils/three-helpers';
-import { COLORS, SECTIONS } from '../../../utils/constants';
+import { COLORS } from '../../../utils/constants';
 import { usePopup } from '../../../contexts/PopupContext';
 
 interface WelcomeAreaProps {
