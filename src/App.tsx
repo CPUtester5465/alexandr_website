@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 // import './App.css'; // Removed - using Tailwind CSS
 
@@ -7,6 +7,7 @@ import LoadingScreen from './components/UI/HUD/LoadingScreen';
 import SectionLabel from './components/UI/HUD/SectionLabel';
 import ControlsPanel from './components/UI/Controls/ControlsPanel';
 import ContentPopup from './components/UI/Popups/ContentPopup';
+import MobileDisclaimer from './components/UI/HUD/MobileDisclaimer';
 
 // 3D Components  
 import Scene3D from './components/3D/Scene/Scene3D';
@@ -14,8 +15,40 @@ import Scene3D from './components/3D/Scene/Scene3D';
 // Context
 import { PopupProvider, usePopup } from './contexts/PopupContext';
 
+// Utils
+import { isMobileDevice } from './utils/device-detection';
+
 const AppContent: React.FC = () => {
   const popup = usePopup();
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [allowMobileAccess, setAllowMobileAccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(isMobileDevice());
+    };
+
+    // Check on mount
+    checkIfMobile();
+
+    // Also check on window resize in case device orientation changes
+    window.addEventListener('resize', checkIfMobile);
+    window.addEventListener('orientationchange', checkIfMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+      window.removeEventListener('orientationchange', checkIfMobile);
+    };
+  }, []);
+
+  // Show mobile disclaimer if on mobile and user hasn't chosen to continue
+  if (isMobile && !allowMobileAccess) {
+    return (
+      <MobileDisclaimer 
+        onContinueAnyway={() => setAllowMobileAccess(true)}
+      />
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden relative">
