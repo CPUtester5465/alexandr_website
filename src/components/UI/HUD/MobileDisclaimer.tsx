@@ -240,7 +240,7 @@ const MobileDisclaimer: React.FC<MobileDisclaimerProps> = ({ onContinueAnyway })
                       color: '#374151'
                     }}
                   >
-                    alexandr@portfolio.com
+                    goriainovalexandr@gmail.com
                   </span>
                 </div>
               </div>
