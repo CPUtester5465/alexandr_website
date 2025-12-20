@@ -111,5 +111,13 @@ export const artworks: Artwork[] = [
     filename: "Poppy-in-Green-Weather.png",
     emoji: "🌺",
     frameColor: "#F97316"
+  },
+  {
+    id: 'cosmic-threads',
+    title: "Cosmic Threads",
+    desc: "Abstract planetary forms orbit around a central cosmic pillar, each sphere textured with stripes, grids, and dotted patterns suggesting distinct worlds. White flowing tendrils weave between them like gravitational threads or cosmic strings, mapping invisible connections. Monochromatic washes and linear detailing create depth and motion in the void. It reads as a meditation on interconnectedness—each celestial body unique yet bound within a larger, living network.",
+    filename: "Cosmic-Threads.png",
+    emoji: "🪐",
+    frameColor: "#4C1D95"
   }
 ];
