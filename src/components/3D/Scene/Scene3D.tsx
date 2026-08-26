@@ -64,8 +64,8 @@ const Scene3D: React.FC = () => {
 
   return (
     <group ref={sceneRef}>
-      {mode === 'poppy' ? (
-        <Dimension />
+      {mode !== 'hub' && mode !== 'legacy' ? (
+        <Dimension slug={mode} />
       ) : mode === 'legacy' ? (
         <>
           {/* Environment */}

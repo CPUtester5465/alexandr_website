@@ -17,7 +17,13 @@ export interface DimensionEntry {
   title: { en: string; ru: string };
   /** Sampled from the painting, most-used first. */
   palette: string[];
-  /** Is the world behind this door generated yet? */
+  /**
+   * Is the world behind this door generated yet?
+   *
+   * All fourteen are, since every dimension is a recipe over the same chunked
+   * generator. Kept as a field rather than deleted: the next painting he makes
+   * gets a door before it gets a world, and it must be able to say so.
+   */
   built: boolean;
 }
 
@@ -35,31 +41,31 @@ export const DIMENSIONS: DimensionEntry[] = [
   { slug: 'poppy', painting: 'Poppy-in-Green-Weather',
     title: { en: 'Poppy in Green Weather', ru: 'Мак в зелёную погоду' }, built: true, palette: [] },
   { slug: 'divide', painting: 'Sailing-the-Divide',
-    title: { en: 'Sailing the Divide', ru: 'Под парусом по разлому' }, built: false, palette: [] },
+    title: { en: 'Sailing the Divide', ru: 'Под парусом по разлому' }, built: true, palette: [] },
   { slug: 'whisper', painting: 'Weight-of-a-Whisper',
-    title: { en: 'Weight of a Whisper', ru: 'Вес шёпота' }, built: false, palette: [] },
+    title: { en: 'Weight of a Whisper', ru: 'Вес шёпота' }, built: true, palette: [] },
   { slug: 'desert-table', painting: 'Desert-Table-Curved-Voices',
-    title: { en: 'Desert Table, Curved Voices', ru: 'Пустынный стол, изогнутые голоса' }, built: false, palette: [] },
+    title: { en: 'Desert Table, Curved Voices', ru: 'Пустынный стол, изогнутые голоса' }, built: true, palette: [] },
   { slug: 'tide', painting: 'Tide-Wanderer',
-    title: { en: 'Tide Wanderer', ru: 'Странник прилива' }, built: false, palette: [] },
+    title: { en: 'Tide Wanderer', ru: 'Странник прилива' }, built: true, palette: [] },
   { slug: 'pagoda', painting: 'Pagoda-in-Red-Weather',
-    title: { en: 'Pagoda in Red Weather', ru: 'Пагода в красную погоду' }, built: false, palette: [] },
+    title: { en: 'Pagoda in Red Weather', ru: 'Пагода в красную погоду' }, built: true, palette: [] },
   { slug: 'tram', painting: 'Last-Run-of-Tram-No-5',
-    title: { en: 'Last Run of Tram No. 5', ru: 'Последний рейс пятого трамвая' }, built: false, palette: [] },
+    title: { en: 'Last Run of Tram No. 5', ru: 'Последний рейс пятого трамвая' }, built: true, palette: [] },
   { slug: 'clockwork-fish', painting: 'Clockwork-Fish',
-    title: { en: 'Clockwork Fish', ru: 'Часовая рыба' }, built: false, palette: [] },
+    title: { en: 'Clockwork Fish', ru: 'Часовая рыба' }, built: true, palette: [] },
   { slug: 'three-sails', painting: 'Three-Sails-at-Dusk',
-    title: { en: 'Three Sails at Dusk', ru: 'Три паруса в сумерках' }, built: false, palette: [] },
+    title: { en: 'Three Sails at Dusk', ru: 'Три паруса в сумерках' }, built: true, palette: [] },
   { slug: 'headwind', painting: 'Headwind',
-    title: { en: 'Headwind', ru: 'Встречный ветер' }, built: false, palette: [] },
+    title: { en: 'Headwind', ru: 'Встречный ветер' }, built: true, palette: [] },
   { slug: 'cup-apple', painting: 'Cup-Apple-Quiet-Light',
-    title: { en: 'Cup & Apple, Quiet Light', ru: 'Чашка и яблоко, тихий свет' }, built: false, palette: [] },
+    title: { en: 'Cup & Apple, Quiet Light', ru: 'Чашка и яблоко, тихий свет' }, built: true, palette: [] },
   { slug: 'vessel', painting: 'Vessel-with-Shadow',
-    title: { en: 'Vessel with Shadow', ru: 'Сосуд с тенью' }, built: false, palette: [] },
+    title: { en: 'Vessel with Shadow', ru: 'Сосуд с тенью' }, built: true, palette: [] },
   { slug: 'gravity', painting: 'When-Gravity-Sleeps',
-    title: { en: 'When Gravity Sleeps', ru: 'Когда гравитация спит' }, built: false, palette: [] },
+    title: { en: 'When Gravity Sleeps', ru: 'Когда гравитация спит' }, built: true, palette: [] },
   { slug: 'cosmic-threads', painting: 'Cosmic-Threads',
-    title: { en: 'Cosmic Threads', ru: 'Космические нити' }, built: false, palette: [] }
+    title: { en: 'Cosmic Threads', ru: 'Космические нити' }, built: true, palette: [] }
 ].map((entry) => ({ ...entry, palette: paletteOf(entry.painting) }));
 
 export function dimensionBySlug(slug: string): DimensionEntry | undefined {

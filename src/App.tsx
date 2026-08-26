@@ -8,6 +8,7 @@ import ControlsPanel from './components/UI/Controls/ControlsPanel';
 import LookPad from './components/UI/Controls/LookPad';
 import DoorLabel from './components/UI/HUD/DoorLabel';
 import TravelFade from './components/UI/HUD/TravelFade';
+import WayHome from './components/UI/HUD/WayHome';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -73,6 +74,7 @@ const AppContent: React.FC = () => {
           <SectionLabel />
         </div>
         <DoorLabel />
+        <WayHome />
         <div className="pointer-events-auto">
           <ControlsPanel isTouch={isTouch} />
         </div>

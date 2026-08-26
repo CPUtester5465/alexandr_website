@@ -101,9 +101,11 @@ describe('the hub', () => {
     }
   });
 
-  it('marks exactly one door as built, and says so honestly', () => {
-    // Status is a fact, not a grade. When the second world lands this number
-    // changes, and the test should be updated rather than loosened.
-    expect(hub.doors.filter((d) => d.built).map((d) => d.slug)).toEqual(['poppy']);
+  it('has a world behind every door', () => {
+    // Status is a fact, not a grade. All fourteen are generated now, because a
+    // dimension is a recipe over one generator rather than a build. When he
+    // paints a fifteenth it gets a door before it gets a world, and this is
+    // where that shows up.
+    expect(hub.doors.filter((d) => d.built)).toHaveLength(14);
   });
 });

@@ -1,36 +1,30 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { meshVolume, quadCount, BLOCK } from '../../../world/voxel';
+import ChunkedWorld from './ChunkedWorld';
+import { makeTerrainField } from '../../../world/chunk';
 import { setTerrain, clearTerrain } from '../../../world/terrain';
 import { controlState } from '../../../state/controlState';
 import { PLAYER_CONFIG } from '../../../utils/constants';
-import { generate, COLOURS, SIZE, EXTENT, PALETTE } from '../../../world/dimensions/poppy';
+import { specBySlug } from '../../../world/dimensions/specs';
 import { travelTo } from '../../../state/worldState';
+import { setWayHome } from '../../../state/hubState';
 
 /**
- * Dimension 01 — Poppy in Green Weather.
+ * A dimension: one of his paintings, from the inside, going on as far as you
+ * care to walk.
  *
- * The whole world is one mesh. Greedy meshing collapses 56x30x56 cells into a
- * few thousand quads, which is well inside the budget on its own, so chunking
- * would be machinery in place of a problem. When a dimension needs to be bigger
- * than one draw call, this is where chunks arrive.
- *
- * MeshBasicMaterial with vertex colours, and no lights at all. Every bit of
- * shading is baked in the mesher: ambient occlusion per vertex plus a fixed
- * shade per face direction. That is how block games have always done it, it is
- * flat the way the design system requires, and it is the cheapest material
- * three.js has.
+ * Nothing here is specific to a painting. The world is a DimensionSpec -- a
+ * palette sampled from the file plus a dozen numbers -- so all fourteen run
+ * through this same component and adding the fifteenth is a recipe, not a build.
  */
 
-/**
- * The way back.
- *
- * A doorway standing where you arrived, in the hub's own wood, so it reads as
- * out-of-place here on purpose -- the one thing in the meadow that is not made
- * of the painting. Walk into it and you are back in the room.
- */
-const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string; facing: number }> = ({ at, slug, facing }) => {
+const ARRIVAL_HEADING = Math.PI;   // into the world, never at the way back
+const DOOR_BEHIND = 11;            // units back over his shoulder
+const DOOR_ARMS_AT = 18;
+const DOOR_OPENS_AT = 3.4;
+
+const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
   const armed = useRef(false);
 
   useFrame(() => {
@@ -38,80 +32,77 @@ const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string; facing: number }> 
       at.x - controlState.playerPosition.x,
       at.z - controlState.playerPosition.z
     );
-    // Arm only once he has walked properly away. He starts eleven units from it
-    // with his back turned, so this cannot fire on arrival.
-    if (d > 16) armed.current = true;
-    if (armed.current && d < 3.4) travelTo('hub', 0x6B4E31, slug);
+    if (d > DOOR_ARMS_AT) armed.current = true;
+    if (armed.current && d < DOOR_OPENS_AT) travelTo('hub', 0x6B4E31, slug);
   });
 
   return (
-    <group position={[at.x, at.y, at.z]} rotation={[0, facing, 0]}>
-      <mesh position={[0, 3.2, 0]}>
-        <boxGeometry args={[5.2, 6.4, 0.9]} />
+    <group position={[at.x, at.y, at.z]} rotation={[0, ARRIVAL_HEADING, 0]}>
+      <mesh position={[0, 3.4, 0]}>
+        <boxGeometry args={[5.4, 6.8, 1.0]} />
         <meshBasicMaterial color={0x8A5A33} />
       </mesh>
-      {/* The opening reads as the hub's own darkness, not as a hole. There is
-          no light here on purpose: this dimension is unlit and everything in it
-          is baked, so a lamp would illuminate nothing and only look like it
-          might. */}
-      <mesh position={[0, 3.0, 0.1]}>
-        <boxGeometry args={[3.6, 5.2, 1.0]} />
+      {/* The opening reads as the hub's own darkness. No light source: this
+          world is unlit and everything in it is baked, so a lamp would
+          illuminate nothing and only look as though it might. */}
+      <mesh position={[0, 3.2, 0.12]}>
+        <boxGeometry args={[3.6, 5.4, 1.1]} />
         <meshBasicMaterial color={0x1A1410} />
       </mesh>
     </group>
   );
 };
 
-const Dimension: React.FC = () => {
-  const world = useMemo(() => generate(), []);
-  const geometry = useMemo(() => meshVolume(world.volume, COLOURS), [world]);
+const Dimension: React.FC<{ slug: string }> = ({ slug }) => {
+  const spec = useMemo(() => specBySlug(slug), [slug]);
+  const field = useMemo(() => (spec ? makeTerrainField(spec) : null), [spec]);
+
+  const arrival = useMemo(() => {
+    if (!field) return null;
+    const spawn = new THREE.Vector3(0, field.heightAt(0, 0), 0);
+    const back = new THREE.Vector3(
+      -Math.sin(ARRIVAL_HEADING) * DOOR_BEHIND,
+      0,
+      -Math.cos(ARRIVAL_HEADING) * DOOR_BEHIND
+    );
+    back.y = field.heightAt(back.x, back.z);
+    return { spawn, door: back };
+  }, [field]);
 
   useEffect(() => {
-    setTerrain(world.heightAt, EXTENT);
-    // Stand him on the ground rather than dropping him through it.
+    if (!spec || !field || !arrival) return;
+
+    // No edges. The world is generated where he stands, so the bounds only
+    // exist to stop a runaway; they are far past anything anyone will walk.
+    const far = 40000;
+    setTerrain(field.heightAt, { minX: -far, maxX: far, minZ: -far, maxZ: far });
+
     controlState.playerPosition.set(
-      world.spawn.x,
-      world.spawn.y + PLAYER_CONFIG.HEIGHT,
-      world.spawn.z
+      arrival.spawn.x,
+      arrival.spawn.y + PLAYER_CONFIG.HEIGHT,
+      arrival.spawn.z
     );
-    // Face him into the world with the way home behind him, and set the camera
-    // over his shoulder so the doorway stays visible without being in the way.
-    controlState.heading = world.arrivalHeading;
-    controlState.cameraYaw = world.arrivalHeading + Math.PI;
+    controlState.heading = ARRIVAL_HEADING;
+    controlState.cameraYaw = ARRIVAL_HEADING + Math.PI;
     controlState.inputYaw = controlState.cameraYaw;
     controlState.speed = 0;
     controlState.manualCameraFor = 0;
+    setWayHome(arrival.door);
 
-    if (import.meta.env.DEV) {
-      const quads = quadCount(geometry);
-      const cells = SIZE.x * SIZE.y * SIZE.z;
-      console.info(
-        `[dimension:poppy] ${cells.toLocaleString()} cells -> ${quads.toLocaleString()} quads, 1 draw call`
-      );
-    }
-    return () => clearTerrain();
-  }, [world, geometry]);
+    return () => {
+      clearTerrain();
+      setWayHome(null);
+    };
+  }, [spec, field, arrival]);
 
-  const material = useMemo(
-    () => new THREE.MeshBasicMaterial({ vertexColors: true }),
-    []
-  );
+  if (!spec || !arrival) return null;
 
   return (
     <group>
-      {/* The mesh is built from voxel index 0; shift it so the world is centred. */}
-      <mesh
-        geometry={geometry}
-        material={material}
-        position={[-(SIZE.x / 2) * BLOCK, 0, -(SIZE.z / 2) * BLOCK]}
-      />
-
-      <ReturnDoor at={world.returnDoor} slug="poppy" facing={world.arrivalHeading} />
-
-      {/* Green weather. The fog colour is the painting's pale green, so the
-          horizon dissolves into the same paint the ground is made of. */}
-      <color attach="background" args={[PALETTE.PALE.hex]} />
-      <fog attach="fog" args={[PALETTE.PALE.hex, 40, 190]} />
+      <ChunkedWorld spec={spec} />
+      <ReturnDoor at={arrival.door} slug={slug} />
+      <color attach="background" args={[spec.sky]} />
+      <fog attach="fog" args={[spec.sky, spec.fog.near, spec.fog.far]} />
     </group>
   );
 };

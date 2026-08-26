@@ -80,7 +80,26 @@ function cornerAo(side1: number, side2: number, corner: number): number {
  *
  * `colours` is indexed by block id; index 0 is unused because 0 means air.
  */
-export function meshVolume(volume: Volume, colours: THREE.Color[]): THREE.BufferGeometry {
+export interface MeshOptions {
+  /**
+   * Ignore this many cells of skirt on every horizontal side.
+   *
+   * A chunk meshed in isolation emits faces along all four of its own edges,
+   * because from inside the chunk its neighbour looks like air -- a wall of
+   * hidden geometry at every seam, and light leaking through the cracks. So
+   * each chunk is generated one block wider on each side and that skirt is used
+   * for occlusion only. Faces BETWEEN the skirt and the interior are kept:
+   * those are real cliffs. Only faces lying wholly in the skirt are dropped.
+   */
+  trim?: number;
+}
+
+export function meshVolume(
+  volume: Volume,
+  colours: THREE.Color[],
+  options: MeshOptions = {}
+): THREE.BufferGeometry {
+  const trim = options.trim ?? 0;
   const dims = [volume.sx, volume.sy, volume.sz];
   const positions: number[] = [];
   const normals: number[] = [];
@@ -112,6 +131,18 @@ export function meshVolume(volume: Volume, colours: THREE.Color[]): THREE.Buffer
           if ((a !== 0) === (b !== 0)) {
             mask[n] = 0;
             continue;
+          }
+
+          // Clip the skirt here, before the merge, rather than clipping quads
+          // after it -- a merged run must never straddle the boundary.
+          if (trim > 0) {
+            const planeOut = d !== 1 && (x[d] + 1 < trim || x[d] + 1 > dims[d] - trim);
+            const uOut = u !== 1 && (x[u] < trim || x[u] > dims[u] - trim - 1);
+            const vOut = v !== 1 && (x[v] < trim || x[v] > dims[v] - trim - 1);
+            if (planeOut || uOut || vOut) {
+              mask[n] = 0;
+              continue;
+            }
           }
           const facingPositive = a !== 0;
           mask[n] = facingPositive ? a : -b;
@@ -207,7 +238,8 @@ export function meshVolume(volume: Volume, colours: THREE.Color[]): THREE.Buffer
 
         for (const c of winding) {
           const p = corners[c];
-          positions.push(p[0] * BLOCK, p[1] * BLOCK, p[2] * BLOCK);
+          // Shift so a chunk's own origin is the origin of its mesh.
+          positions.push((p[0] - trim) * BLOCK, p[1] * BLOCK, (p[2] - trim) * BLOCK);
           normals.push(normal[0], normal[1], normal[2]);
           const shade = directional * ao[c];
           colors.push(base.r * shade, base.g * shade, base.b * shade);
