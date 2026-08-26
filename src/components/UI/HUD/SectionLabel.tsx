@@ -13,7 +13,7 @@ const SectionLabel: React.FC = () => {
       className="fixed top-6 left-1/2 transform -translate-x-1/2 z-40"
     >
       <div 
-        className="bg-white/95 backdrop-blur-md px-8 py-3 rounded-full shadow-lg border border-white/20"
+        className="bg-white/95 px-8 py-3 rounded-full shadow-lg border border-white/20"
         style={{
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif'
         }}
