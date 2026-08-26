@@ -23,9 +23,20 @@ export interface Bounds {
 
 type HeightSampler = (x: number, z: number) => number;
 
+/**
+ * Where the world will let him stand.
+ *
+ * A rectangle is not enough. The hub is a round room whose only ways out are
+ * fourteen doorways cut through the wall, so its walkable area is a disc with
+ * fourteen notches -- and clamping that to a box put every door four units
+ * beyond the furthest he could reach. He could see them and never touch one.
+ */
+export type PositionClamp = (x: number, z: number) => { x: number; z: number };
+
 const FLAT: HeightSampler = () => 0;
 
 let sampler: HeightSampler = FLAT;
+let clamp: PositionClamp | null = null;
 let bounds: Bounds = {
   minX: WORLD_BOUNDS.MIN_X,
   maxX: WORLD_BOUNDS.MAX_X,
@@ -34,14 +45,20 @@ let bounds: Bounds = {
 };
 
 /** A dimension installs its ground when it mounts. */
-export function setTerrain(next: HeightSampler, nextBounds: Bounds): void {
+export function setTerrain(
+  next: HeightSampler,
+  nextBounds: Bounds,
+  nextClamp: PositionClamp | null = null
+): void {
   sampler = next;
   bounds = nextBounds;
+  clamp = nextClamp;
 }
 
 /** Back to a flat plane, when a dimension unmounts. */
 export function clearTerrain(): void {
   sampler = FLAT;
+  clamp = null;
   bounds = {
     minX: WORLD_BOUNDS.MIN_X,
     maxX: WORLD_BOUNDS.MAX_X,
@@ -57,4 +74,13 @@ export function groundHeightAt(x: number, z: number): number {
 
 export function getBounds(): Bounds {
   return bounds;
+}
+
+/** Keep him inside the world, whatever shape it is. */
+export function clampPosition(x: number, z: number): { x: number; z: number } {
+  if (clamp) return clamp(x, z);
+  return {
+    x: Math.max(bounds.minX, Math.min(bounds.maxX, x)),
+    z: Math.max(bounds.minZ, Math.min(bounds.maxZ, z))
+  };
 }

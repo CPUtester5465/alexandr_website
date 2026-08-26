@@ -75,7 +75,7 @@ const Hub: React.FC = () => {
   );
 
   useEffect(() => {
-    setTerrain(hub.heightAt, hub.extent);
+    setTerrain(hub.heightAt, hub.extent, hub.clampToRoom);
 
     // Come back through the door you left by, standing a few paces inside it --
     // close enough to know where you are, far enough not to be swallowed again.
@@ -136,7 +136,7 @@ const Hub: React.FC = () => {
     }
   });
 
-  const size = HUB.radius * 2 + 6;
+  const size = (HUB.radius + HUB.wallThickness + 3) * 2;
 
   return (
     <group>

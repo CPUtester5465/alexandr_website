@@ -59,6 +59,48 @@ describe('the hub', () => {
     expect(quadCount(geometry)).toBeLessThan(20000);
   });
 
+  it('lets him actually reach every door', () => {
+    // The bug this exists for: the walkable area was clamped to a box of +/-38
+    // while the doors sat at radius 42, so he could see all fourteen and touch
+    // none of them. Tests asserted the doors were positioned correctly and said
+    // nothing about whether he could get to one.
+    const DOOR_CROSSING = 2.6;
+    for (const door of hub.doors) {
+      // Walk straight at it from the middle of the room and stop where the
+      // world stops you.
+      const far = door.facing.clone().multiplyScalar(1000);
+      const stopped = hub.clampToRoom(far.x, far.z);
+      const gap = Math.hypot(stopped.x - door.position.x, stopped.z - door.position.z);
+      expect(gap).toBeLessThan(DOOR_CROSSING);
+    }
+  });
+
+  it('keeps him inside the room everywhere else', () => {
+    // Between two doors he must not be able to walk out through the wall.
+    const between = (hub.doors[0].angle + hub.doors[1].angle) / 2;
+    const far = { x: Math.sin(between) * 1000, z: Math.cos(between) * 1000 };
+    const stopped = hub.clampToRoom(far.x, far.z);
+    expect(Math.hypot(stopped.x, stopped.z) / BLOCK).toBeLessThan(HUB.radius);
+  });
+
+  it('cuts each doorway clear through, and lights the far end', () => {
+    // The other half of the bug: the alcove back panel was written out of
+    // bounds and silently dropped, so every doorway opened onto nothing.
+    const size = (HUB.radius + HUB.wallThickness + 3) * 2;
+    const centre = Math.floor(size / 2);
+    for (const door of hub.doors) {
+      const at = (radius: number) => {
+        const x = Math.round(centre + door.facing.x * radius);
+        const z = Math.round(centre + door.facing.z * radius);
+        return blockAt(hub.volume, x, 2, z);
+      };
+      // Clear through the middle of the wall...
+      expect(at(HUB.radius + 1)).toBe(H.AIR);
+      // ...and lit at the back.
+      expect(at(HUB.radius + HUB.wallThickness - 0.5)).not.toBe(H.AIR);
+    }
+  });
+
   it('marks exactly one door as built, and says so honestly', () => {
     // Status is a fact, not a grade. When the second world lands this number
     // changes, and the test should be updated rather than loosened.

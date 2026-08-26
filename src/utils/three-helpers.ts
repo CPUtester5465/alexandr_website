@@ -1,16 +1,12 @@
 import * as THREE from 'three';
-import { getBounds } from '../world/terrain';
+import { clampPosition } from '../world/terrain';
 
 /**
  * Clamp position within world boundaries
  */
 export const clampToWorldBounds = (position: THREE.Vector3): THREE.Vector3 => {
-  const bounds = getBounds();
-  return new THREE.Vector3(
-    Math.max(bounds.minX, Math.min(bounds.maxX, position.x)),
-    position.y,
-    Math.max(bounds.minZ, Math.min(bounds.maxZ, position.z))
-  );
+  const clamped = clampPosition(position.x, position.z);
+  return new THREE.Vector3(clamped.x, position.y, clamped.z);
 };
 
 /**

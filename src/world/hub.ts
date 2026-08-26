@@ -22,8 +22,11 @@ import { DIMENSIONS, doorColour, frameColour } from './dimensions/registry';
 export const HUB = {
   /** Inner radius of the floor, in blocks. */
   radius: 20,
+  /** How thick the wall is, and therefore how deep each doorway is. */
+  wallThickness: 4,
   wallHeight: 9,
-  doorWidth: 3,
+  /** Half-width of an opening, in blocks, measured at the inner face. */
+  doorHalfWidth: 2,
   doorHeight: 5
 };
 
@@ -72,11 +75,13 @@ export interface GeneratedHub {
   heightAt(x: number, z: number): number;
   spawn: THREE.Vector3;
   extent: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** The walkable shape: a disc, notched at every doorway. */
+  clampToRoom(x: number, z: number): { x: number; z: number };
 }
 
 export function generateHub(): GeneratedHub {
   const R = HUB.radius;
-  const size = R * 2 + 6;          // room plus wall thickness plus a margin
+  const size = (R + HUB.wallThickness + 3) * 2;   // room, wall, and room to breathe
   const height = HUB.wallHeight + 2;
   const volume = createVolume(size, height, size);
   const centre = Math.floor(size / 2);
@@ -94,7 +99,7 @@ export function generateHub(): GeneratedHub {
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const d = Math.hypot(x - centre, z - centre);
-      if (d > R + 2) continue;
+      if (d > R + HUB.wallThickness) continue;
       const inside = d <= R;
       const checker = (Math.floor(x / 3) + Math.floor(z / 3)) % 2 === 0;
       setBlock(volume, x, 0, z, inside && checker ? H.FLOOR_ALT : H.FLOOR);
@@ -120,49 +125,67 @@ export function generateHub(): GeneratedHub {
   }
 
   // --- the doors -------------------------------------------------------------
+  // Carved by testing every cell of the wall ring against every door's angle,
+  // rather than by stepping outward from the centre. Stepping rounds each step
+  // to an integer cell, which leaves gaps at some angles and runs off the end
+  // of the array at others -- the back panel of every alcove was being written
+  // out of bounds and silently dropped.
   const doors: Door[] = [];
   let nextId: number = H.DOOR_BASE;
+  const doorIds = DIMENSIONS.map(() => ({ light: nextId++, frame: nextId++ }));
 
   DIMENSIONS.forEach((entry, i) => {
-    const angle = (i / DIMENSIONS.length) * Math.PI * 2;
-    const lightId = nextId++;
-    const frameId = nextId++;
-    colours[lightId] = new THREE.Color(doorColour(entry));
-    colours[frameId] = new THREE.Color(frameColour(entry));
+    colours[doorIds[i].light] = new THREE.Color(doorColour(entry));
+    colours[doorIds[i].frame] = new THREE.Color(frameColour(entry));
+  });
 
-    const dirX = Math.sin(angle);
-    const dirZ = Math.cos(angle);
-    // Tangent, so the opening is cut across the wall rather than along it.
-    const tanX = dirZ;
-    const tanZ = -dirX;
+  const doorAngles = DIMENSIONS.map((_, i) => (i / DIMENSIONS.length) * Math.PI * 2);
 
-    const half = Math.floor(HUB.doorWidth / 2);
-    for (let t = -half - 1; t <= half + 1; t++) {
-      for (let y = 1; y <= HUB.doorHeight + 1; y++) {
-        // Two blocks of wall thickness, cut through.
-        for (let depth = 0; depth <= 3; depth++) {
-          const x = Math.round(centre + dirX * (R + depth - 0.5) + tanX * t);
-          const z = Math.round(centre + dirZ * (R + depth - 0.5) + tanZ * t);
-          const isOpening = Math.abs(t) <= half && y <= HUB.doorHeight;
-          const isFrame = !isOpening && (Math.abs(t) <= half + 1 && y <= HUB.doorHeight + 1);
-          if (isOpening) {
-            // The lit panel sits at the back of the alcove; the way through is
-            // clear until the world behind it exists.
-            setBlock(volume, x, y, z, depth >= 3 ? lightId : H.AIR);
-          } else if (isFrame) {
-            setBlock(volume, x, y, z, frameId);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - centre;
+      const dz = z - centre;
+      const d = Math.hypot(dx, dz);
+      if (d < R - 1 || d > R + HUB.wallThickness) continue;
+
+      const angle = Math.atan2(dx, dz);
+      for (let i = 0; i < doorAngles.length; i++) {
+        let off = angle - doorAngles[i];
+        while (off > Math.PI) off -= Math.PI * 2;
+        while (off < -Math.PI) off += Math.PI * 2;
+
+        // Angular half-width shrinks with radius, so the opening stays the same
+        // number of blocks wide all the way through the wall.
+        const arc = HUB.doorHalfWidth / Math.max(d, 1);
+        const frameArc = (HUB.doorHalfWidth + 1) / Math.max(d, 1);
+        if (Math.abs(off) > frameArc) continue;
+
+        const opening = Math.abs(off) <= arc;
+        for (let y = 1; y <= HUB.doorHeight + 1; y++) {
+          if (opening && y <= HUB.doorHeight) {
+            // Clear the way through, and light the far end of the alcove.
+            const backPanel = d >= R + HUB.wallThickness - 1;
+            setBlock(volume, x, y, z, backPanel ? doorIds[i].light : H.AIR);
+          } else {
+            setBlock(volume, x, y, z, doorIds[i].frame);
           }
         }
+        break;
       }
     }
+  }
 
-    const worldX = (centre + dirX * (R + 1) - size / 2) * BLOCK;
-    const worldZ = (centre + dirZ * (R + 1) - size / 2) * BLOCK;
+  DIMENSIONS.forEach((entry, i) => {
+    const angle = doorAngles[i];
+    const dirX = Math.sin(angle);
+    const dirZ = Math.cos(angle);
+    // Sit the trigger inside the alcove, so walking in is what fires it.
+    const radius = (R + HUB.wallThickness - 2) * BLOCK;
     doors.push({
       slug: entry.slug,
       title: entry.title,
       built: entry.built,
-      position: new THREE.Vector3(worldX, BLOCK, worldZ),
+      position: new THREE.Vector3(dirX * radius, BLOCK, dirZ * radius),
       facing: new THREE.Vector3(dirX, 0, dirZ),
       angle,
       colour: doorColour(entry)
@@ -172,11 +195,31 @@ export function generateHub(): GeneratedHub {
   // The floor is one block thick and the room is flat, so the ground is simply
   // the top of it -- until a hub needs stairs, which it does not.
   const floorTop = BLOCK;
-  const extent = {
-    minX: -(R - 1) * BLOCK,
-    maxX: (R - 1) * BLOCK,
-    minZ: -(R - 1) * BLOCK,
-    maxZ: (R - 1) * BLOCK
+  const reach = (R + HUB.wallThickness - 1) * BLOCK;
+  const extent = { minX: -reach, maxX: reach, minZ: -reach, maxZ: reach };
+
+  // A disc, notched at each doorway. The notch is a little narrower than the
+  // opening so he cannot scrape along the inside of the frame.
+  const innerLimit = (R - 0.8) * BLOCK;
+  const alcoveLimit = reach;
+  const clampToRoom = (x: number, z: number) => {
+    const r = Math.hypot(x, z);
+    if (r <= innerLimit) return { x, z };
+
+    const angle = Math.atan2(x, z);
+    let limit = innerLimit;
+    for (const a of doorAngles) {
+      let off = angle - a;
+      while (off > Math.PI) off -= Math.PI * 2;
+      while (off < -Math.PI) off += Math.PI * 2;
+      if (Math.abs(off) <= (HUB.doorHalfWidth - 0.7) / R) {
+        limit = alcoveLimit;
+        break;
+      }
+    }
+    if (r <= limit) return { x, z };
+    const scale = limit / r;
+    return { x: x * scale, z: z * scale };
   };
 
   return {
@@ -185,6 +228,7 @@ export function generateHub(): GeneratedHub {
     doors,
     heightAt: () => floorTop,
     spawn: new THREE.Vector3(0, floorTop, (R - 6) * BLOCK),
-    extent
+    extent,
+    clampToRoom
   };
 }
