@@ -27,7 +27,17 @@ import { controlState } from '../../../state/controlState';
  */
 
 const RADIUS = 3;          // chunks in each direction: a 7x7 window
+
+/**
+ * One chunk a frame is plenty for walking -- sixty a second against a pace that
+ * crosses one every few seconds. It is not enough for a fast travel, which
+ * lands him on ground that does not exist yet. Anything close enough to be
+ * under his feet is built at once instead, up to a cap, and the horizon
+ * continues to trickle in.
+ */
 const MAX_BUILDS_PER_FRAME = 1;
+const URGENT_DISTANCE_SQ = 2;      // the 3x3 around him
+const MAX_URGENT_PER_FRAME = 4;
 
 interface LoadedChunk {
   key: string;
@@ -75,7 +85,12 @@ const ChunkedWorld: React.FC<{ spec: DimensionSpec }> = ({ spec }) => {
 
     // Nearest first, so the ground under his feet exists before the horizon.
     missing.sort((a, b) => a.distance - b.distance);
-    for (const { cx, cz } of missing.slice(0, MAX_BUILDS_PER_FRAME)) {
+    const urgent = missing.filter((m) => m.distance <= URGENT_DISTANCE_SQ);
+    const budget = urgent.length > 0
+      ? Math.min(urgent.length, MAX_URGENT_PER_FRAME)
+      : MAX_BUILDS_PER_FRAME;
+
+    for (const { cx, cz } of missing.slice(0, budget)) {
       const volume = buildChunk(spec, { cx, cz }, field);
       const geometry = meshChunk(spec, volume);
       loaded.current.set(keyString({ cx, cz }), {

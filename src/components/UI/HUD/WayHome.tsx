@@ -41,7 +41,7 @@ const WayHome: React.FC = () => {
       className="fixed z-30 pointer-events-none flex items-center gap-2"
       style={{
         left: 'calc(env(safe-area-inset-left, 0px) + 16px)',
-        top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 150px)',
         padding: '8px 12px',
         borderRadius: '999px',
         background: 'rgba(26, 20, 16, 0.7)',

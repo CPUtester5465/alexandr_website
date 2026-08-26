@@ -9,6 +9,7 @@ import { PLAYER_CONFIG } from '../../../utils/constants';
 import { specBySlug } from '../../../world/dimensions/specs';
 import { travelTo } from '../../../state/worldState';
 import { setWayHome } from '../../../state/hubState';
+import { setActiveDimension } from '../../../state/dimensionState';
 
 /**
  * A dimension: one of his paintings, from the inside, going on as far as you
@@ -88,10 +89,12 @@ const Dimension: React.FC<{ slug: string }> = ({ slug }) => {
     controlState.speed = 0;
     controlState.manualCameraFor = 0;
     setWayHome(arrival.door);
+    setActiveDimension(spec);
 
     return () => {
       clearTerrain();
       setWayHome(null);
+      setActiveDimension(null);
     };
   }, [spec, field, arrival]);
 
