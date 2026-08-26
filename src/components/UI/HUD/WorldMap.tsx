@@ -6,6 +6,10 @@ import { groundHeightAt } from '../../../world/terrain';
 import { travelTo } from '../../../state/worldState';
 import { BLOCK } from '../../../world/voxel';
 import { structuresIn } from '../../../world/chunk';
+import { makeSmoothField } from '../../../world/smoothMesh';
+import { shrineSites, shrineKey, shrineIsDark } from '../../3D/World/PagodaFlora';
+import { seedSites, seedKey } from '../../3D/World/Seeds';
+import { isDone } from '../../../state/activityState';
 
 /**
  * A map of the world you are standing in, and a way to cross it.
@@ -84,17 +88,49 @@ const WorldMap: React.FC = () => {
     }
     ctx.putImageData(image, 0, 0);
 
-    // Landmarks: the structures are the only things out there worth steering by.
+    // Landmarks first, then THE ACTIVITIES -- in an endless world the map's
+    // real job is not edges (there are none) but "what is there to do, and
+    // what have I already done". The activity sites come from the same pure
+    // channels the scene streams from, so map and world cannot disagree.
     const minB = Math.floor((centre.current.x - HALF * SCALE * BLOCK) / BLOCK);
     const maxB = Math.ceil((centre.current.x + HALF * SCALE * BLOCK) / BLOCK);
     const minBz = Math.floor((centre.current.z - HALF * SCALE * BLOCK) / BLOCK);
     const maxBz = Math.ceil((centre.current.z + HALF * SCALE * BLOCK) / BLOCK);
-    const accent = spec.palette[2] ?? '#ffffff';
-    ctx.fillStyle = accent;
+    const toPx = (wx: number, wz: number): [number, number] => [
+      HALF + (wx - centre.current.x) / (SCALE * BLOCK),
+      HALF + (wz - centre.current.z) / (SCALE * BLOCK)
+    ];
+
+    ctx.fillStyle = spec.palette[2] ?? '#ffffff';
     for (const s of structuresIn(spec, minB, minBz, maxB, maxBz)) {
-      const px = HALF + (s.bx * BLOCK - centre.current.x) / (SCALE * BLOCK);
-      const py = HALF + (s.bz * BLOCK - centre.current.z) / (SCALE * BLOCK);
+      const [px, py] = toPx(s.bx * BLOCK, s.bz * BLOCK);
       ctx.fillRect(px - 1, py - 1, 2, 2);
+    }
+
+    const field = makeSmoothField(spec);
+    const cBx = Math.round(centre.current.x / BLOCK);
+    const cBz = Math.round(centre.current.z / BLOCK);
+    if (spec.slug === 'pagoda') {
+      for (const site of shrineSites(spec, field, cBx, cBz)) {
+        if (!shrineIsDark(site)) continue;
+        const [px, py] = toPx(site.x, site.z);
+        const woken = isDone(spec.slug, shrineKey(site));
+        ctx.fillStyle = woken ? '#C87467' : '#3B3839';
+        ctx.strokeStyle = '#C87467';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(px, py, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    if (spec.slug === 'poppy') {
+      for (const site of seedSites(spec, field, cBx, cBz)) {
+        if (isDone(spec.slug, seedKey(site))) continue;
+        const [px, py] = toPx(site.x, site.z);
+        ctx.fillStyle = '#AC7036';
+        ctx.fillRect(px - 0.8, py - 0.8, 1.6, 1.6);
+      }
     }
   }, [spec]);
 

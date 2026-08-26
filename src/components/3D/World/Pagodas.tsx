@@ -5,6 +5,8 @@ import { SmoothField, poppiesForArea, cellHash01 } from '../../../world/smoothMe
 import { streamSeed } from '../../../world/rng';
 import { BLOCK } from '../../../world/voxel';
 import { BLOOM_LAYER } from '../PostFX';
+import { useChunkWindow } from '../../../hooks/useChunkWindow';
+import { CHUNK } from '../../../world/chunk';
 
 /**
  * The pagodas, standing at the SAME structure sites the voxel path used for
@@ -52,7 +54,13 @@ function towersAround(spec: DimensionSpec, field: SmoothField, cx: number, cz: n
  * The field arrives as a prop from SmoothDimension, same as Grass and Poppies.
  */
 const Pagodas: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ spec, field }) => {
-  const towers = useMemo(() => towersAround(spec, field, 0, 0), [spec, field]);
+  // Rebuilds when he crosses a chunk boundary -- a few times a minute at
+  // walking pace -- so towers exist wherever he is, not in a bubble at spawn.
+  const window = useChunkWindow();
+  const towers = useMemo(
+    () => towersAround(spec, field, window.cx * CHUNK * BLOCK, window.cz * CHUNK * BLOCK),
+    [spec, field, window.cx, window.cz]
+  );
 
   const { bodies, eaves, spires, windows } = useMemo(() => {
     // Lifted off pure ink: at arm's length a tower must still show its form

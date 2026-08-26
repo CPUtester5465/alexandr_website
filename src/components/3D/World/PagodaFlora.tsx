@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DimensionSpec } from '../../../world/dimensions/specs';
 import { SmoothField, cellHash01 } from '../../../world/smoothMesh';
@@ -6,6 +7,10 @@ import { streamSeed } from '../../../world/rng';
 import { BLOCK } from '../../../world/voxel';
 import { PAD_RADIUS } from '../../../world/chunk';
 import { BLOOM_LAYER } from '../PostFX';
+import { useChunkWindow } from '../../../hooks/useChunkWindow';
+import { CHUNK } from '../../../world/chunk';
+import { controlState } from '../../../state/controlState';
+import { markDone, isDone } from '../../../state/activityState';
 
 /**
  * The valley between the towers, which Tim found empty -- because it was.
@@ -22,17 +27,26 @@ import { BLOOM_LAYER } from '../PostFX';
 
 const VIEW_BLOCKS = 96;
 
-interface Site { x: number; y: number; z: number; s1: number; s2: number; s3: number }
+export interface Site { x: number; y: number; z: number; s1: number; s2: number; s3: number }
 
-/** A jittered-grid channel, same discipline as structuresIn, different salt. */
-function channel(
+/**
+ * A jittered-grid channel, same discipline as structuresIn, different salt.
+ * Pure over world position, so the map and the activity layer can call it for
+ * ANY window and agree with the scene exactly.
+ */
+export function channel(
   spec: DimensionSpec, field: SmoothField,
-  name: string, spacing: number, density: number
+  name: string, spacing: number, density: number,
+  centerBx = 0, centerBz = 0
 ): Site[] {
   const seed = streamSeed(spec.seed, name);
   const out: Site[] = [];
-  for (let gz = -Math.floor(VIEW_BLOCKS / spacing); gz <= Math.floor(VIEW_BLOCKS / spacing); gz++) {
-    for (let gx = -Math.floor(VIEW_BLOCKS / spacing); gx <= Math.floor(VIEW_BLOCKS / spacing); gx++) {
+  const g0x = Math.floor((centerBx - VIEW_BLOCKS) / spacing);
+  const g1x = Math.floor((centerBx + VIEW_BLOCKS) / spacing);
+  const g0z = Math.floor((centerBz - VIEW_BLOCKS) / spacing);
+  const g1z = Math.floor((centerBz + VIEW_BLOCKS) / spacing);
+  for (let gz = g0z; gz <= g1z; gz++) {
+    for (let gx = g0x; gx <= g1x; gx++) {
       if (cellHash01(seed, gx, gz, 1) > density) continue;
       const bx = gx * spacing + Math.floor(cellHash01(seed, gx, gz, 2) * (spacing - 2)) + 1;
       const bz = gz * spacing + Math.floor(cellHash01(seed, gx, gz, 3) * (spacing - 2)) + 1;
@@ -49,10 +63,53 @@ function channel(
   return out;
 }
 
+/** The shrine sites for any window -- shared with the map and the HUD. */
+export function shrineSites(
+  spec: DimensionSpec, field: SmoothField, centerBx: number, centerBz: number
+): Site[] {
+  return channel(spec, field, 'flora:shrines', 21, 0.5, centerBx, centerBz);
+}
+
+/** A shrine's stable identity: its world block position. */
+export const shrineKey = (s: Site) => `${Math.round(s.x)},${Math.round(s.z)}`;
+
+/** Dark by seed -- these are the ones that can be woken. */
+export const shrineIsDark = (s: Site) => s.s2 >= 0.6;
+
 const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ spec, field }) => {
+  const window = useChunkWindow();
+  const centerBx = window.cx * CHUNK;
+  const centerBz = window.cz * CHUNK;
+  // Session-lit shrines force a rebuild of the light instances.
+  const litVersion = useRef(0);
+  const [, bump] = React.useReducer((n: number) => n + 1, 0);
+
+  // THE ACTIVITY, from the lore brief: waking dark shrines. Stand at one and
+  // its window lights, permanently for the session, and the map remembers.
+  useFrame(() => {
+    const near = shrineSites(spec, field, centerBx, centerBz);
+    for (const s of near) {
+      if (!shrineIsDark(s)) continue;
+      const key = shrineKey(s);
+      if (isDone(spec.slug, key)) continue;
+      const d = Math.hypot(
+        s.x - controlState.playerPosition.x,
+        s.z - controlState.playerPosition.z
+      );
+      if (d < 3.2) {
+        if (markDone(spec.slug, key)) {
+          litVersion.current++;
+          bump();
+        }
+      }
+    }
+  });
+
   const objects = useMemo(() => {
-    const boughs = channel(spec, field, 'flora:boughs', 9, 0.62);
-    const shrines = channel(spec, field, 'flora:shrines', 21, 0.5);
+    // Loosened from 9/0.62 after the far-field shot: at that density the
+    // valley reads as a wall, and the brief's word is valley, not forest.
+    const boughs = channel(spec, field, 'flora:boughs', 12, 0.48, centerBx, centerBz);
+    const shrines = shrineSites(spec, field, centerBx, centerBz);
 
     const inkTrunk = new THREE.MeshLambertMaterial({
       color: (spec.colours[spec.blocks.stem] ?? new THREE.Color('#201F20'))
@@ -107,7 +164,8 @@ const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ sp
       const driftZ = Math.cos(lean.y) * height * sway * 1.2;
       for (let c = 0; c < 2; c++) {
         const along = 0.5 + c * 0.45;
-        const size = (2.0 + b.s2 * 2.4) * (1 - c * 0.28);
+        // Capped: an s2 near 1 was making canopies read as crimson floors.
+        const size = Math.min(2.0 + b.s2 * 2.4, 3.4) * (1 - c * 0.28);
         m.compose(
           new THREE.Vector3(
             b.x + driftX * along + (b.s3 - 0.5) * 2.2,
@@ -137,8 +195,9 @@ const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ sp
       shrineBodies.setMatrixAt(i, m);
       m.compose(new THREE.Vector3(s.x, s.y + 2.5, s.z), q, new THREE.Vector3(2.5, 0.4, 2.5));
       shrineRoofs.setMatrixAt(i, m);
-      // Lit or dark by seed -- the brief's own rule. Dark ones scale to nothing.
-      const lit = s.s2 < 0.6;
+      // Lit by seed, or woken by the visitor -- the brief's own rule plus its
+      // own activity. A woken shrine stays lit for the session.
+      const lit = s.s2 < 0.6 || isDone(spec.slug, shrineKey(s));
       m.compose(
         new THREE.Vector3(s.x, s.y + 1.2, s.z), q,
         lit ? new THREE.Vector3(0.9, 0.7, 0.9) : new THREE.Vector3(0, 0, 0)
@@ -148,7 +207,7 @@ const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ sp
 
     // Mist stones: the third kind of thing in the valley, low grey masses the
     // fog can pool against.
-    const stones = channel(spec, field, 'flora:stones', 13, 0.55);
+    const stones = channel(spec, field, 'flora:stones', 13, 0.55, centerBx, centerBz);
     const stoneMaterial = new THREE.MeshLambertMaterial({
       color: (spec.colours[spec.blocks.surface] ?? new THREE.Color('#737479'))
         .clone().multiplyScalar(0.92)
@@ -169,7 +228,7 @@ const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ sp
     }
     shrineLights.layers.enable(BLOOM_LAYER);
     return { trunks, canopies, canopiesDeep, shrineBodies, shrineRoofs, shrineLights, stones: stoneMeshes };
-  }, [spec, field]);
+  }, [spec, field, centerBx, centerBz, litVersion.current]);
 
   return (
     <group>

@@ -6,6 +6,7 @@ import Grass from './Grass';
 import Poppies from './Poppies';
 import Pagodas from './Pagodas';
 import PagodaFlora from './PagodaFlora';
+import Seeds from './Seeds';
 import SkyDome from './SkyDome';
 import PostFX from '../PostFX';
 import { ReturnDoor } from './Dimension';
@@ -138,6 +139,7 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
           flowers, the mist valley gets towers and bare ground. */}
       {spec.structure.kind === 'flower' && <Grass spec={spec} field={field} />}
       {spec.structure.kind === 'flower' && <Poppies spec={spec} field={field} />}
+      {spec.structure.kind === 'flower' && <Seeds spec={spec} field={field} />}
       {spec.structure.kind === 'pillar' && (
         <>
           <Pagodas spec={spec} field={field} />
