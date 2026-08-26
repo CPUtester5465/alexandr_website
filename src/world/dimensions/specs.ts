@@ -195,6 +195,7 @@ const RECIPES: Recipe[] = [
     physics: { gravity: 26, speed: 14 }, fog: { near: 20, far: 190 }, skyIndex: 2 },
 
   { slug: 'pagoda', terrain: RIDGE, structure: PILLARS,
+    pano: '/marble/pagoda-sky.webp',
     roles: { surface: 2, deep: 1, pale: 5, stem: 1, accent: 0, accentLit: 4, core: 3 },
     fog: { near: 25, far: 200 } },
 
