@@ -6,22 +6,26 @@ import { DIMENSIONS } from './dimensions/registry';
 describe('the hub', () => {
   const hub = generateHub();
 
-  it('cuts one door per painting', () => {
+  it('cuts one door per painting and one per subject', () => {
     expect(hub.doors).toHaveLength(DIMENSIONS.length);
-    expect(hub.doors).toHaveLength(14);
+    expect(hub.doors).toHaveLength(18);
+    expect(hub.doors.filter((d) => d.kind === 'painting')).toHaveLength(14);
+    expect(hub.doors.filter((d) => d.kind === 'subject')).toHaveLength(4);
   });
 
-  it('gives every door its own sampled colour', () => {
+  it('gives every door its own colour', () => {
     const colours = new Set(hub.doors.map((d) => d.colour));
-    // Fourteen paintings, fourteen palettes. If two doors match, the sampling
-    // collapsed and the room stops being a chart of his work.
-    expect(colours.size).toBe(14);
+    // Fourteen paintings and four subjects. If two match, either the sampling
+    // collapsed or a subject is being lit in its paper rather than its one
+    // rationed colour -- which would give four identical doors and lose the
+    // entire point of rationing.
+    expect(colours.size).toBe(18);
   });
 
   it('spaces the doors evenly round the wall', () => {
     const angles = hub.doors.map((d) => d.angle).sort((a, b) => a - b);
     const gaps = angles.slice(1).map((a, i) => a - angles[i]);
-    const expected = (Math.PI * 2) / 14;
+    const expected = (Math.PI * 2) / 18;
     for (const gap of gaps) expect(gap).toBeCloseTo(expected, 5);
   });
 
@@ -56,7 +60,25 @@ describe('the hub', () => {
   it('meshes to one draw call inside the mobile budget', () => {
     const geometry = meshVolume(hub.volume, hub.colours);
     expect(quadCount(geometry)).toBeGreaterThan(100);
-    expect(quadCount(geometry)).toBeLessThan(20000);
+    expect(quadCount(geometry)).toBeLessThan(30000);
+  });
+
+  it('leaves wall between every pair of doors', () => {
+    // Eighteen openings on a ring that was sized for fourteen would grow their
+    // frames into one another and the room would become a colonnade.
+    const size = (HUB.radius + HUB.wallThickness + 3) * 2;
+    const centre = Math.floor(size / 2);
+    for (let i = 0; i < hub.doors.length; i++) {
+      const a = hub.doors[i].angle;
+      const b = hub.doors[(i + 1) % hub.doors.length].angle;
+      let mid = (a + b) / 2;
+      if (Math.abs(b - a) > Math.PI) mid += Math.PI;
+      const r = HUB.radius + 1;
+      const x = Math.round(centre + Math.sin(mid) * r);
+      const z = Math.round(centre + Math.cos(mid) * r);
+      expect(blockAt(hub.volume, x, 3, z), `no wall between doors ${i} and ${i + 1}`)
+        .not.toBe(H.AIR);
+    }
   });
 
   it('lets him actually reach every door', () => {
@@ -96,8 +118,11 @@ describe('the hub', () => {
       };
       // Clear through the middle of the wall...
       expect(at(HUB.radius + 1)).toBe(H.AIR);
-      // ...and lit at the back.
-      expect(at(HUB.radius + HUB.wallThickness - 0.5)).not.toBe(H.AIR);
+      // ...and lit somewhere across the back of the alcove. Which exact cell
+      // the panel lands in depends on the angle's rounding, so scan the band
+      // rather than betting on one radius.
+      const band = [0, 0.5, 1].map((o) => at(HUB.radius + HUB.wallThickness - 1.2 + o));
+      expect(band.some((b) => b !== H.AIR), `door ${door.slug} opens onto nothing`).toBe(true);
     }
   });
 
@@ -106,6 +131,6 @@ describe('the hub', () => {
     // dimension is a recipe over one generator rather than a build. When he
     // paints a fifteenth it gets a door before it gets a world, and this is
     // where that shows up.
-    expect(hub.doors.filter((d) => d.built)).toHaveLength(14);
+    expect(hub.doors.filter((d) => d.built)).toHaveLength(18);
   });
 });

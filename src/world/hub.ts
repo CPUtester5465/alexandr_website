@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createVolume, setBlock, Volume, BLOCK } from './voxel';
-import { DIMENSIONS, doorColour, frameColour } from './dimensions/registry';
+import { DIMENSIONS, doorColour, frameColour, DoorKind } from './dimensions/registry';
 
 /**
  * THE HUB — the room with fourteen doors.
@@ -20,8 +20,14 @@ import { DIMENSIONS, doorColour, frameColour } from './dimensions/registry';
  */
 
 export const HUB = {
-  /** Inner radius of the floor, in blocks. */
-  radius: 20,
+  /**
+   * Inner radius of the floor, in blocks.
+   *
+   * Sized by the doors, not by taste: eighteen openings seven blocks wide need
+   * about nine blocks of wall each, so the ring has to be at least 26 across
+   * the radius or the frames grow into one another.
+   */
+  radius: 26,
   /** How thick the wall is, and therefore how deep each doorway is. */
   wallThickness: 4,
   wallHeight: 9,
@@ -57,6 +63,7 @@ const ROOM = {
 
 export interface Door {
   slug: string;
+  kind: DoorKind;
   title: { en: string; ru: string };
   built: boolean;
   /** Centre of the doorway, in world units. */
@@ -164,7 +171,7 @@ export function generateHub(): GeneratedHub {
         for (let y = 1; y <= HUB.doorHeight + 1; y++) {
           if (opening && y <= HUB.doorHeight) {
             // Clear the way through, and light the far end of the alcove.
-            const backPanel = d >= R + HUB.wallThickness - 1;
+            const backPanel = d >= R + HUB.wallThickness - 1.6;
             setBlock(volume, x, y, z, backPanel ? doorIds[i].light : H.AIR);
           } else {
             setBlock(volume, x, y, z, doorIds[i].frame);
@@ -183,6 +190,7 @@ export function generateHub(): GeneratedHub {
     const radius = (R + HUB.wallThickness - 2) * BLOCK;
     doors.push({
       slug: entry.slug,
+      kind: entry.kind,
       title: entry.title,
       built: entry.built,
       position: new THREE.Vector3(dirX * radius, BLOCK, dirZ * radius),

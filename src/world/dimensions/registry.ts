@@ -1,4 +1,5 @@
 import palettes from '../generated/palettes.json';
+import { SUBJECTS } from './subjects';
 
 /**
  * The doors, and what is behind each of them.
@@ -10,9 +11,20 @@ import palettes from '../generated/palettes.json';
  * src/data/artworks.ts, which is his own description of his own work.
  */
 
+export type DoorKind = 'painting' | 'subject';
+
 export interface DimensionEntry {
   slug: string;
-  /** File in art-originals/, without the extension. */
+  /**
+   * What sort of door this is.
+   *
+   * Fourteen paintings and four subjects, in one room, treated as the same kind
+   * of thing -- because they are. He measures the world and he paints its
+   * weather, and the site should not put one behind glass and the other on a
+   * wall.
+   */
+  kind: DoorKind;
+  /** File in art-originals/, without the extension. Empty for a subject. */
   painting: string;
   title: { en: string; ru: string };
   /** Sampled from the painting, most-used first. */
@@ -66,18 +78,41 @@ export const DIMENSIONS: DimensionEntry[] = [
     title: { en: 'When Gravity Sleeps', ru: 'Когда гравитация спит' }, built: true, palette: [] },
   { slug: 'cosmic-threads', painting: 'Cosmic-Threads',
     title: { en: 'Cosmic Threads', ru: 'Космические нити' }, built: true, palette: [] }
-].map((entry) => ({ ...entry, palette: paletteOf(entry.painting) }));
+].map((entry) => ({ ...entry, kind: 'painting' as DoorKind, palette: paletteOf(entry.painting) }))
+  .concat(
+    // The subjects sit after the paintings so the room reads as work, then
+    // mind. Their palettes are the study's own materials plus one colour each.
+    SUBJECTS.map((subject) => ({
+      slug: subject.slug,
+      kind: 'subject' as DoorKind,
+      painting: '',
+      title: subject.title,
+      built: true,
+      palette: subject.palette
+    }))
+  );
 
 export function dimensionBySlug(slug: string): DimensionEntry | undefined {
   return DIMENSIONS.find((d) => d.slug === slug);
 }
 
-/** The colour a door is lit in: the painting's most-used colour. */
+/**
+ * The colour a door is lit in.
+ *
+ * A painting's is its most-used colour, so the room becomes a chart of his
+ * palettes. A subject's is its one rationed colour, which is the last entry --
+ * lighting a subject door in paper-cream would make four identical doors and
+ * lose the whole point of rationing.
+ */
 export function doorColour(entry: DimensionEntry): number {
-  return parseInt((entry.palette[0] ?? '#888888').slice(1), 16);
+  const hex = entry.kind === 'subject'
+    ? entry.palette[entry.palette.length - 1]
+    : entry.palette[0];
+  return parseInt((hex ?? '#888888').slice(1), 16);
 }
 
-/** The colour of its frame: the strongest accent that is not the ground tone. */
+/** The colour of its frame: for a subject, the study's own wood. */
 export function frameColour(entry: DimensionEntry): number {
+  if (entry.kind === 'subject') return 0x8A5A33;
   return parseInt((entry.palette[2] ?? entry.palette[1] ?? '#666666').slice(1), 16);
 }

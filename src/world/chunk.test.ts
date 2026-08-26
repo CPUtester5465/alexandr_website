@@ -128,9 +128,33 @@ describe('the arrival clearing', () => {
   });
 });
 
-describe('all fourteen worlds', () => {
+describe('all eighteen worlds', () => {
   it('every door has a spec behind it', () => {
-    expect(SPECS).toHaveLength(14);
+    expect(SPECS).toHaveLength(18);
+  });
+
+  it('gives the four subjects the study palette plus one colour each', () => {
+    // The subjects share paper, plaster, stone, graphite and ink, and differ
+    // only in the last entry. If two ever shared that colour they would stop
+    // being distinguishable, which is the entire mechanism.
+    const subjects = SPECS.filter((s) =>
+      ['mathematics', 'invention', 'chemistry', 'economics'].includes(s.slug));
+    expect(subjects).toHaveLength(4);
+    const rationed = subjects.map((s) => s.palette[s.palette.length - 1]);
+    expect(new Set(rationed).size).toBe(4);
+    for (const s of subjects) {
+      expect(s.palette.slice(0, 5)).toEqual(subjects[0].palette.slice(0, 5));
+    }
+  });
+
+  it('builds every subject world without falling over', () => {
+    for (const spec of SPECS.filter((s) => s.painting === '')) {
+      const f = makeTerrainField(spec);
+      const volume = buildChunk(spec, { cx: 1, cz: 1 }, f);
+      const solid = volume.data.reduce((n, c) => n + (c ? 1 : 0), 0);
+      expect(solid, `${spec.slug} generated nothing`).toBeGreaterThan(500);
+      expect(quadCount(meshChunk(spec, volume))).toBeLessThan(9000);
+    }
   });
 
   it('each one generates ground you can stand on', () => {
@@ -148,6 +172,6 @@ describe('all fourteen worlds', () => {
   });
 
   it('seeds every world differently', () => {
-    expect(new Set(SPECS.map((s) => s.seed)).size).toBe(14);
+    expect(new Set(SPECS.map((s) => s.seed)).size).toBe(18);
   });
 });

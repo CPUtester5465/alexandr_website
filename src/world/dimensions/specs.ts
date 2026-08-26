@@ -20,7 +20,14 @@ import { DIMENSIONS } from './registry';
  * filled in later -- it is what he drew.
  */
 
-export type StructureKind = 'flower' | 'pillar' | 'none';
+export type StructureKind =
+  | 'flower'    // a head of petals on a stem -- the meadows
+  | 'pillar'    // a plain column -- seascapes and spires
+  | 'lattice'   // a column with cross-beams, on a true grid -- mathematics
+  | 'machine'   // a stepped, blocky assembly -- invention
+  | 'crystal'   // an angular spire in a cluster -- chemistry
+  | 'scale'     // paired columns with a beam across -- economics
+  | 'none';
 
 export interface DimensionSpec {
   slug: string;
@@ -42,9 +49,23 @@ export interface DimensionSpec {
     ridged: boolean;
     warpFrequency: number;
     warpStrength: number;
+    /**
+     * Quantise height to steps of this many blocks. Zero is off.
+     *
+     * A terraced landscape reads as constructed rather than grown, which is
+     * what a mathematics world wants and a meadow does not.
+     */
+    terrace: number;
   };
   structure: {
     kind: StructureKind;
+    /**
+     * Sit exactly on the grid rather than jittering within the cell.
+     *
+     * Random placement is right for a meadow and wrong for a proof: things
+     * that were worked out sit where they were put.
+     */
+    aligned: boolean;
     /** Blocks between candidate sites. */
     spacing: number;
     /** 0..1 chance a site is used. */
@@ -77,35 +98,66 @@ interface Recipe {
 /** Rolling meadow, giant flowers -- the reference world. */
 const MEADOW: Recipe['terrain'] = {
   base: 6, amplitude: 5, frequency: 0.045, octaves: 4, ridged: false,
-  warpFrequency: 0.05, warpStrength: 6
+  warpFrequency: 0.05, warpStrength: 6, terrace: 0
+};
+
+/** Stepped and squared off. The ground as a working, not as a landscape. */
+const CONSTRUCTED: Recipe['terrain'] = {
+  base: 5, amplitude: 6, frequency: 0.028, octaves: 3, ridged: false,
+  warpFrequency: 0.012, warpStrength: 1.5, terrace: 3
+};
+/** Sharp and faceted. */
+const FACETED: Recipe['terrain'] = {
+  base: 5, amplitude: 8, frequency: 0.05, octaves: 4, ridged: true,
+  warpFrequency: 0.03, warpStrength: 3, terrace: 2
 };
 /** Long low swells, almost no vertical. For the seascapes. */
 const SWELL: Recipe['terrain'] = {
+  terrace: 0,
   base: 4, amplitude: 2.4, frequency: 0.02, octaves: 3, ridged: false,
   warpFrequency: 0.03, warpStrength: 9
 };
 /** Crests and spires. Ridged noise makes ridges, not lumps. */
 const RIDGE: Recipe['terrain'] = {
+  terrace: 0,
   base: 7, amplitude: 11, frequency: 0.03, octaves: 5, ridged: true,
   warpFrequency: 0.04, warpStrength: 7
 };
 /** Table-flat, because a still life is. */
 const STILL: Recipe['terrain'] = {
+  terrace: 0,
   base: 3, amplitude: 0.9, frequency: 0.015, octaves: 2, ridged: false,
   warpFrequency: 0.02, warpStrength: 3
 };
 
 const FLOWERS: Recipe['structure'] = {
-  kind: 'flower', spacing: 11, density: 0.72, minHeight: 7, maxHeight: 13, minRadius: 3, maxRadius: 4
+  kind: 'flower', aligned: false, spacing: 11, density: 0.72,
+  minHeight: 7, maxHeight: 13, minRadius: 3, maxRadius: 4
+};
+const LATTICE: Recipe['structure'] = {
+  kind: 'lattice', aligned: true, spacing: 8, density: 0.85,
+  minHeight: 5, maxHeight: 14, minRadius: 2, maxRadius: 3
+};
+const MACHINES: Recipe['structure'] = {
+  kind: 'machine', aligned: false, spacing: 14, density: 0.7,
+  minHeight: 6, maxHeight: 16, minRadius: 2, maxRadius: 4
+};
+const CRYSTALS: Recipe['structure'] = {
+  kind: 'crystal', aligned: false, spacing: 9, density: 0.8,
+  minHeight: 4, maxHeight: 15, minRadius: 1, maxRadius: 3
+};
+const SCALES: Recipe['structure'] = {
+  kind: 'scale', aligned: false, spacing: 16, density: 0.65,
+  minHeight: 6, maxHeight: 14, minRadius: 3, maxRadius: 5
 };
 const SPARSE_FLOWERS: Recipe['structure'] = {
-  kind: 'flower', spacing: 17, density: 0.5, minHeight: 5, maxHeight: 9, minRadius: 2, maxRadius: 3
+  kind: 'flower', aligned: false, spacing: 17, density: 0.5, minHeight: 5, maxHeight: 9, minRadius: 2, maxRadius: 3
 };
 const PILLARS: Recipe['structure'] = {
-  kind: 'pillar', spacing: 13, density: 0.6, minHeight: 6, maxHeight: 18, minRadius: 1, maxRadius: 1
+  kind: 'pillar', aligned: false, spacing: 13, density: 0.6, minHeight: 6, maxHeight: 18, minRadius: 1, maxRadius: 1
 };
 const NOTHING: Recipe['structure'] = {
-  kind: 'none', spacing: 20, density: 0, minHeight: 0, maxHeight: 0, minRadius: 0, maxRadius: 0
+  kind: 'none', aligned: false, spacing: 20, density: 0, minHeight: 0, maxHeight: 0, minRadius: 0, maxRadius: 0
 };
 
 const RECIPES: Recipe[] = [
@@ -168,14 +220,45 @@ const RECIPES: Recipe[] = [
 
   { slug: 'cosmic-threads', terrain: RIDGE, structure: PILLARS,
     roles: { surface: 0, deep: 4, pale: 2, stem: 1, accent: 3, accentLit: 2, core: 5 },
-    fog: { near: 25, far: 220 } }
+    fog: { near: 25, far: 220 } },
+
+  // --- the four subjects -----------------------------------------------------
+  // Palette order for all four: paper, plaster, stone, graphite, ink, then the
+  // one rationed colour at index 5. The ground is his study; the colour is what
+  // the subject is made of.
+
+  // The ground IS the working: terraced, squared off, on a true grid.
+  { slug: 'mathematics', terrain: CONSTRUCTED, structure: LATTICE,
+    roles: { surface: 0, deep: 2, pale: 1, stem: 3, accent: 5, accentLit: 5, core: 4 },
+    fog: { near: 60, far: 340 }, skyIndex: 0 },
+
+  // Machines you walk through rather than past. Brass on paper.
+  { slug: 'invention', terrain: STILL, structure: MACHINES,
+    roles: { surface: 1, deep: 2, pale: 0, stem: 3, accent: 5, accentLit: 5, core: 4 },
+    fog: { near: 45, far: 300 }, skyIndex: 0 },
+
+  // Faceted ground, crystals in clusters.
+  { slug: 'chemistry', terrain: FACETED, structure: CRYSTALS,
+    roles: { surface: 2, deep: 3, pale: 1, stem: 4, accent: 5, accentLit: 5, core: 3 },
+    fog: { near: 35, far: 260 }, skyIndex: 0 },
+
+  // Paired heights, and everything balances. Ledger indigo.
+  { slug: 'economics', terrain: CONSTRUCTED, structure: SCALES,
+    roles: { surface: 1, deep: 2, pale: 0, stem: 3, accent: 5, accentLit: 5, core: 4 },
+    fog: { near: 50, far: 320 }, skyIndex: 0 }
 ];
 
 function buildSpec(recipe: Recipe): DimensionSpec {
   const entry = DIMENSIONS.find((d) => d.slug === recipe.slug);
   if (!entry) throw new Error(`No registry entry for dimension "${recipe.slug}"`);
 
-  const hexes = (P[entry.painting] ?? []).map((c) => c.hex);
+  // The registry already knows: a painting's palette is sampled from its file,
+  // a subject's is the study's materials plus its one colour. Re-deriving from
+  // the painting here silently gave all four subject worlds an empty palette
+  // and a grey fallback, which looked like four identical worlds.
+  const hexes = entry.palette.length > 0
+    ? entry.palette
+    : (P[entry.painting] ?? []).map((c) => c.hex);
   const pick = (i: number | undefined, fallback: number) =>
     new THREE.Color(hexes[i ?? fallback] ?? hexes[0] ?? '#888888');
 

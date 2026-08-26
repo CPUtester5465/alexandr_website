@@ -89,7 +89,13 @@ export function makeTerrainField(spec: DimensionSpec): TerrainField {
     // Flatten toward the arrival clearing, easing out so it reads as a level
     // place in the landscape rather than a disc cut out of it.
     const flatten = smoothstep(PAD_RADIUS, PAD_RADIUS * 0.55, Math.hypot(bx, bz));
-    const h = raw + (terrain.base - raw) * flatten;
+    let h = raw + (terrain.base - raw) * flatten;
+
+    // Terracing reads as constructed rather than grown -- ground that was
+    // worked out. Applied after the pad so the clearing stays level either way.
+    if (terrain.terrace > 0) {
+      h = Math.round(h / terrain.terrace) * terrain.terrace;
+    }
     return Math.max(1, Math.round(h));
   };
 
@@ -134,8 +140,13 @@ export function structuresIn(
   for (let gz = Math.floor(minBz / cell); gz <= Math.floor(maxBz / cell); gz++) {
     for (let gx = Math.floor(minBx / cell); gx <= Math.floor(maxBx / cell); gx++) {
       if (cellHash(seed, gx, gz, 1) > structure.density) continue;
-      const bx = gx * cell + Math.floor(cellHash(seed, gx, gz, 2) * (cell - 2)) + 1;
-      const bz = gz * cell + Math.floor(cellHash(seed, gx, gz, 3) * (cell - 2)) + 1;
+      // Aligned worlds sit on the grid; the rest jitter inside their cell.
+      const bx = structure.aligned
+        ? gx * cell
+        : gx * cell + Math.floor(cellHash(seed, gx, gz, 2) * (cell - 2)) + 1;
+      const bz = structure.aligned
+        ? gz * cell
+        : gz * cell + Math.floor(cellHash(seed, gx, gz, 3) * (cell - 2)) + 1;
       if (bx < minBx || bx > maxBx || bz < minBz || bz > maxBz) continue;
       // Nothing grows in the clearing. Four poppies were coming up through the
       // doorway.
@@ -218,18 +229,72 @@ function plantStructure(
     return;
   }
 
-  for (let dz = -s.radius; dz <= s.radius; dz++) {
-    for (let dx = -s.radius; dx <= s.radius; dx++) {
-      const dist = Math.hypot(dx, dz);
-      if (dist > s.radius + 0.35) continue;
-      const lip = dist > s.radius - 1 ? 1 : 0;
-      const bright = cellHash(spec.seed, s.bx + dx, s.bz + dz, 8) < 0.4;
-      setBlock(volume, lx + dx, headY + lip, lz + dz, bright ? B.accentLit : B.accent);
-      if (dist < s.radius - 1.2 && cellHash(spec.seed, s.bx + dx, s.bz + dz, 9) < 0.6) {
-        setBlock(volume, lx + dx, headY + 1 + lip, lz + dz, B.accentLit);
+  // A column with cross-beams, on a true grid. The ground as a working.
+  if (spec.structure.kind === 'lattice') {
+    const arm = s.radius;
+    for (const level of [Math.floor(s.height * 0.45), s.height - 1]) {
+      for (let d = -arm; d <= arm; d++) {
+        setBlock(volume, lx + d, ground + level, lz, B.accent);
+        setBlock(volume, lx, ground + level, lz + d, B.accent);
       }
     }
+    setBlock(volume, lx, headY, lz, B.core);
+    return;
   }
+
+  // A stepped assembly: each stage narrower than the one below it.
+  if (spec.structure.kind === 'machine') {
+    const stages = 3;
+    for (let stage = 0; stage < stages; stage++) {
+      const w = Math.max(1, s.radius - stage);
+      const y0 = ground + Math.floor((s.height / stages) * stage);
+      const y1 = ground + Math.floor((s.height / stages) * (stage + 1));
+      for (let y = y0; y < y1; y++) {
+        for (let dz = -w; dz <= w; dz++) {
+          for (let dx = -w; dx <= w; dx++) {
+            if (Math.abs(dx) !== w && Math.abs(dz) !== w) continue; // hollow
+            setBlock(volume, lx + dx, y, lz + dz, stage % 2 === 0 ? B.stem : B.accent);
+          }
+        }
+      }
+    }
+    setBlock(volume, lx, headY, lz, B.core);
+    return;
+  }
+
+  // An angular spire, tapering. Chemistry grows in facets.
+  if (spec.structure.kind === 'crystal') {
+    for (let y = 0; y < s.height; y++) {
+      const w = Math.max(0, s.radius - Math.floor((y / Math.max(1, s.height)) * (s.radius + 1)));
+      for (let dz = -w; dz <= w; dz++) {
+        for (let dx = -w; dx <= w; dx++) {
+          if (Math.abs(dx) + Math.abs(dz) > w) continue;  // a diamond, not a box
+          const lit = cellHash(spec.seed, s.bx + dx, s.bz + dz + y, 11) < 0.35;
+          setBlock(volume, lx + dx, ground + y, lz + dz, lit ? B.accentLit : B.accent);
+        }
+      }
+    }
+    return;
+  }
+
+  // Two columns and a beam, and the two sides are never the same height --
+  // the whole point of a balance is that it settles somewhere.
+  if (spec.structure.kind === 'scale') {
+    const arm = s.radius;
+    const tilt = Math.floor(cellHash(spec.seed, s.bx, s.bz, 12) * 4) - 2;
+    for (let y = ground; y < headY; y++) setBlock(volume, lx, y, lz, B.stem);
+    for (let d = -arm; d <= arm; d++) {
+      setBlock(volume, lx + d, headY + Math.round((d / arm) * tilt), lz, B.accent);
+    }
+    for (const side of [-arm, arm]) {
+      const y = headY + Math.round((side / arm) * tilt);
+      for (let dz = -1; dz <= 1; dz++) {
+        setBlock(volume, lx + side, y - 1, lz + dz, B.core);
+      }
+    }
+    return;
+  }
+
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
       setBlock(volume, lx + dx, headY + 2, lz + dz, B.core);
