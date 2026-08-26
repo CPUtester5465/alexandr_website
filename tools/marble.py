@@ -76,13 +76,18 @@ def upload_image(path: Path) -> str:
     prep = request("POST", "/media-assets:prepare_upload", {
         "file_name": path.name, "kind": "image", "extension": ext
     })
-    # Field names per docs; tolerate either naming the API returns.
-    signed = prep.get("signed_upload_url") or prep.get("upload_url")
-    asset_id = prep.get("media_asset_id") or prep.get("id")
+    # The live API nests the docs' flat example: media_asset{}, upload_info{}.
+    # Measured 2026-08-26 against a real 200; use its required_headers verbatim
+    # (the length-range differs from the docs too).
+    asset = prep.get("media_asset", prep)
+    info = prep.get("upload_info", prep)
+    signed = info.get("upload_url") or prep.get("signed_upload_url")
+    asset_id = asset.get("media_asset_id") or asset.get("id")
     if not signed or not asset_id:
         sys.exit(f"Unexpected prepare_upload response:\n{json.dumps(prep, indent=2)[:2000]}")
     request("PUT", "", raw_url=signed, data=path.read_bytes(),
-            extra_headers={"x-goog-content-length-range": "0,1048576000"})
+            extra_headers=info.get("required_headers")
+            or {"x-goog-content-length-range": "0,104857600"})
     print(f"uploaded {path.name} -> media asset {asset_id}")
     return asset_id
 
