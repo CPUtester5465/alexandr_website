@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import ChunkedWorld from './ChunkedWorld';
 import SkyDome from './SkyDome';
+import SceneAtmosphere from './SceneAtmosphere';
 import { makeTerrainField } from '../../../world/chunk';
 import { setTerrain, clearTerrain } from '../../../world/terrain';
 import { controlState } from '../../../state/controlState';
@@ -37,7 +38,7 @@ const DOOR_OPENS_AT = 3.6;
  */
 const DOOR_INERT_FOR = 1.4;
 
-const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
+export const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
   const age = useRef(0);
 
   useFrame((_, delta) => {
@@ -131,15 +132,8 @@ const Dimension: React.FC<{ slug: string }> = ({ slug }) => {
     <group>
       <ChunkedWorld spec={spec} />
       <ReturnDoor at={arrival.door} slug={slug} />
-      {spec.pano ? (
-        <SkyDome url={spec.pano} />
-      ) : (
-        <color attach="background" args={[spec.sky]} />
-      )}
-      {/* Fog keeps the sampled sky colour either way: with a pano it is the
-          haze the dome dissolves into, and the far fringe must sit inside the
-          dome radius or the sky itself would be fogged out. */}
-      <fog attach="fog" args={[spec.sky, spec.fog.near, spec.fog.far]} />
+      <SkyDome spec={spec} />
+      <SceneAtmosphere spec={spec} />
     </group>
   );
 };

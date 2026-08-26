@@ -85,7 +85,12 @@ export const CAMERA_CONFIG = {
   /** Pitch is clamped so the camera never dives below the ground plane. */
   MIN_PITCH: 0.12,
   MAX_PITCH: 1.15,
-  INITIAL_PITCH: 0.64,
+  /**
+   * Flattened from 0.64 after the smooth study: at ~35 degrees down the giant
+   * poppy heads -- the whole point of the world -- sat cropped at the top
+   * edge and mid-frame was all stems. At ~0.44 the heads live in frame.
+   */
+  INITIAL_PITCH: 0.44,
 
   /**
    * Auto-follow. The camera swings behind the direction of travel on its own;

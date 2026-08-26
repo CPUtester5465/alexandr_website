@@ -23,6 +23,7 @@ import SteeringIndicator from '../Player/SteeringIndicator';
 // Import section positions
 import { SECTIONS } from '../../../utils/constants';
 import Dimension from '../World/Dimension';
+import SmoothDimension from '../World/SmoothDimension';
 import Hub from '../World/Hub';
 import { useWorld, setWorldImmediately } from '../../../state/worldState';
 
@@ -65,7 +66,9 @@ const Scene3D: React.FC = () => {
   return (
     <group ref={sceneRef}>
       {mode !== 'hub' && mode !== 'legacy' ? (
-        <Dimension slug={mode} />
+        // The smooth painterly study replaces the poppy dimension's view on
+        // this branch; the other seventeen still render the voxel path.
+        mode === 'poppy' ? <SmoothDimension slug={mode} /> : <Dimension slug={mode} />
       ) : mode === 'legacy' ? (
         <>
           {/* Environment */}

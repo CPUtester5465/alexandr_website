@@ -18,6 +18,7 @@ import Scene3D from './components/3D/Scene/Scene3D';
 
 // Context
 import { PopupProvider, usePopup } from './contexts/PopupContext';
+import { useWorld } from './state/worldState';
 
 // Input
 import { useKeyboardControls } from './hooks/useKeyboardControls';
@@ -27,6 +28,7 @@ import { getMaxPixelRatio } from './utils/device-detection';
 const AppContent: React.FC = () => {
   const popup = usePopup();
   const { isTouch } = useInputMode();
+  const { current: currentWorld } = useWorld();
 
   useKeyboardControls();
 
@@ -72,9 +74,13 @@ const AppContent: React.FC = () => {
         className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
         style={{ pointerEvents: 'none' }}
       >
-        <div className="pointer-events-auto">
-          <SectionLabel />
-        </div>
+        {/* The section label narrates the LEGACY scene's zones; in a dimension
+            it fires nonsense ("Achievements Zone" over a poppy meadow). */}
+        {currentWorld === 'legacy' && (
+          <div className="pointer-events-auto">
+            <SectionLabel />
+          </div>
+        )}
         <DoorLabel />
         <WayHome />
         <div className="pointer-events-auto">
