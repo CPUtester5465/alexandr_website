@@ -22,23 +22,41 @@ import { setActiveDimension } from '../../../state/dimensionState';
 
 const ARRIVAL_HEADING = Math.PI;   // into the world, never at the way back
 const DOOR_BEHIND = 11;            // units back over his shoulder
-const DOOR_ARMS_AT = 18;
-const DOOR_OPENS_AT = 3.4;
+const DOOR_OPENS_AT = 3.6;
+
+/**
+ * How long the doorway stays inert after arriving.
+ *
+ * It used to arm by distance -- you had to get eighteen units away before it
+ * would work -- and he arrives eleven units from it. Walk out and back and it
+ * was fine; use the map's fast travel to land nearby and it was permanently
+ * dead, with nothing on screen to say why. The only thing arming has to
+ * prevent is firing during the arrival itself, and a moment of time does that
+ * without depending on where anybody chooses to walk.
+ */
+const DOOR_INERT_FOR = 1.4;
 
 const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
-  const armed = useRef(false);
+  const age = useRef(0);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    age.current += delta;
+    if (age.current < DOOR_INERT_FOR) return;
     const d = Math.hypot(
       at.x - controlState.playerPosition.x,
       at.z - controlState.playerPosition.z
     );
-    if (d > DOOR_ARMS_AT) armed.current = true;
-    if (armed.current && d < DOOR_OPENS_AT) travelTo('hub', 0x6B4E31, slug);
+    if (d < DOOR_OPENS_AT) travelTo('hub', 0x6B4E31, slug);
   });
 
   return (
-    <group position={[at.x, at.y, at.z]} rotation={[0, ARRIVAL_HEADING, 0]}>
+    // cameraTransparent, or the spring arm catches on it and snaps the camera
+    // in every time he walks past.
+    <group
+      position={[at.x, at.y, at.z]}
+      rotation={[0, ARRIVAL_HEADING, 0]}
+      userData={{ cameraTransparent: true }}
+    >
       <mesh position={[0, 3.4, 0]}>
         <boxGeometry args={[5.4, 6.8, 1.0]} />
         <meshBasicMaterial color={0x8A5A33} />
@@ -49,6 +67,14 @@ const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug })
       <mesh position={[0, 3.2, 0.12]}>
         <boxGeometry args={[3.6, 5.4, 1.1]} />
         <meshBasicMaterial color={0x1A1410} />
+      </mesh>
+
+      {/* A mark you can steer by. In a world with no edges the doorway
+          disappears behind the first hill, and the compass tells you the
+          bearing but not what to look for. */}
+      <mesh position={[0, 15, 0]}>
+        <boxGeometry args={[1.1, 18, 1.1]} />
+        <meshBasicMaterial color={0xEDE6D2} transparent opacity={0.5} />
       </mesh>
     </group>
   );

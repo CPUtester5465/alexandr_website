@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChunk, meshChunk, makeTerrainField, structuresIn, CHUNK, CHUNK_HEIGHT } from './chunk';
+import { buildChunk, meshChunk, makeTerrainField, structuresIn, CHUNK, CHUNK_HEIGHT, PAD_RADIUS } from './chunk';
 import { blockAt, quadCount, meshVolume } from './voxel';
 import { SPECS, specBySlug } from './dimensions/specs';
 
@@ -81,6 +81,50 @@ describe('chunk meshing', () => {
   it('stays inside the per-chunk budget', () => {
     const volume = buildChunk(poppy, { cx: 0, cz: 0 }, field);
     expect(quadCount(meshChunk(poppy, volume))).toBeLessThan(6000);
+  });
+});
+
+describe('the arrival clearing', () => {
+  it('is level, in every world', () => {
+    // He arrives at the origin with the doorway eleven units behind him. With
+    // raw terrain that put the door four units below him on a twelve-unit
+    // slope, half buried. A doorway you cannot reach is a world you cannot
+    // leave.
+    for (const spec of SPECS) {
+      const f = makeTerrainField(spec);
+      let min = Infinity;
+      let max = -Infinity;
+      for (let bz = -6; bz <= 6; bz++) {
+        for (let bx = -6; bx <= 6; bx++) {
+          const h = f.columnHeight(bx, bz);
+          min = Math.min(min, h);
+          max = Math.max(max, h);
+        }
+      }
+      expect(max - min, `${spec.slug} arrival is not level`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('eases out rather than cutting a disc', () => {
+    // Well outside the pad the terrain must be its own shape again, or every
+    // world has a crater at the origin.
+    const f = makeTerrainField(specBySlug('poppy')!);
+    let varied = 0;
+    for (let bx = PAD_RADIUS + 6; bx < PAD_RADIUS + 40; bx++) {
+      if (f.columnHeight(bx, 0) !== f.columnHeight(0, 0)) varied++;
+    }
+    expect(varied).toBeGreaterThan(10);
+  });
+
+  it('grows nothing in it, in any world', () => {
+    // The clearing is a circle, so query a square and filter -- a structure in
+    // the corner of the bounding box is legitimately outside it.
+    for (const spec of SPECS) {
+      const reach = PAD_RADIUS * 2;
+      const inside = structuresIn(spec, -reach, -reach, reach, reach)
+        .filter((s) => Math.hypot(s.bx, s.bz) < PAD_RADIUS);
+      expect(inside, `${spec.slug} has something in the clearing`).toHaveLength(0);
+    }
   });
 });
 

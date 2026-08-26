@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createVolume, setBlock, meshVolume, Volume, BLOCK } from './voxel';
-import { makeFbm, makeWarp } from './noise';
+import { makeFbm, makeWarp, smoothstep } from './noise';
 import { streamSeed } from './rng';
 import { DimensionSpec } from './dimensions/specs';
 
@@ -32,6 +32,17 @@ import { DimensionSpec } from './dimensions/specs';
 
 /** Blocks per chunk edge. 32 keeps each mesh small enough to build in a frame. */
 export const CHUNK = 32;
+
+/**
+ * A level clearing at the origin of every world, where he arrives.
+ *
+ * Terrain generated with no regard for the arrival put the doorway four units
+ * below the spawn on a twelve-unit slope, with poppies growing through it. The
+ * pad is folded into the height function rather than stamped on afterwards, so
+ * it is still a pure function of world position -- which means the map draws it
+ * without being told, and the chunk seams across it agree for free.
+ */
+export const PAD_RADIUS = 16;
 
 export interface ChunkKey { cx: number; cz: number }
 
@@ -73,7 +84,13 @@ export function makeTerrainField(spec: DimensionSpec): TerrainField {
     const [wx, wz] = warp(bx, bz);
     const kind = character(wx, wz);
     const amplitude = terrain.amplitude * (0.55 + Math.max(0, kind) * 1.1);
-    return Math.max(1, Math.round(terrain.base + relief(wx, wz) * amplitude));
+    const raw = terrain.base + relief(wx, wz) * amplitude;
+
+    // Flatten toward the arrival clearing, easing out so it reads as a level
+    // place in the landscape rather than a disc cut out of it.
+    const flatten = smoothstep(PAD_RADIUS, PAD_RADIUS * 0.55, Math.hypot(bx, bz));
+    const h = raw + (terrain.base - raw) * flatten;
+    return Math.max(1, Math.round(h));
   };
 
   return {
@@ -120,6 +137,9 @@ export function structuresIn(
       const bx = gx * cell + Math.floor(cellHash(seed, gx, gz, 2) * (cell - 2)) + 1;
       const bz = gz * cell + Math.floor(cellHash(seed, gx, gz, 3) * (cell - 2)) + 1;
       if (bx < minBx || bx > maxBx || bz < minBz || bz > maxBz) continue;
+      // Nothing grows in the clearing. Four poppies were coming up through the
+      // doorway.
+      if (Math.hypot(bx, bz) < PAD_RADIUS + structure.maxRadius + 1) continue;
       out.push({
         bx,
         bz,

@@ -223,7 +223,7 @@ const WorldMap: React.FC = () => {
             {home && (
               <button
                 type="button"
-                onClick={() => { fastTravelTo(home.x, home.z + 12); setOpen(false); }}
+                onClick={() => { fastTravelTo(home.x, home.z - 9); setOpen(false); }}
                 style={{
                   padding: '11px 18px', minHeight: '44px', borderRadius: '10px',
                   background: 'rgba(237, 230, 210, 0.14)', color: '#EDE6D2', fontSize: '13px'
