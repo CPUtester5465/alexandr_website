@@ -134,6 +134,7 @@ A complete list. Each item has an owner phase; nothing here gets dropped.
 | N7 | **Site is English-only.** No i18n layer, no locale routing, no `hreflang`, no `lang` switching. His school, teachers and family read Russian | whole app | 2 |
 | N8 | **`react-scripts` 5.0.1 — CRA was deprecated Feb 2025** and has had no security patches since. `craco` is a patch on top of an unmaintained tool | `package.json` | 0.5 |
 | N9 | Dates, numbers and name order are hard-coded English; no `Intl` usage | `src/data/*` | 2 |
+| N10 | **Tailwind has never run in production** — the `@tailwind` directives ship to the browser unprocessed, so all 24 `className` attributes across 4 components are dead | `craco.config.js` | 0.5 ✅ |
 
 ---
 
@@ -557,5 +558,51 @@ upgrade path *is* Phase 0.5.
 Note the practical risk here is low — a static site with no server, no user
 input and no secrets — but it is unfixable-in-place, and it will only grow.
 
-**Next:** remainder of Phase 0 (toolchain pin, README, retire the duplicate
-`ART/` tree), then Gate 0.5.
+**2026-08-26 — Phase 0 complete.** `chore` — node 22 pinned (`.nvmrc` +
+`engines`), `ART/` renamed to `art-originals/` and documented as the masters
+(its 14 files verified byte-identical to `public/assets/art/`), the 2025 design
+doc and CRA boilerplate readme moved into `docs/`, real README written.
+
+**2026-08-26 — Phase 0.5 complete. Gate 0.5 open — needs a decision.**
+
+Migrated to Vite 8. `react-scripts` + `craco` out; TypeScript 4.9.5 → 5.9.3
+(`moduleResolution: bundler` needs 5.0), `@types/node` 16 → 22 (blocked the Vite
+install). `build.outDir` deliberately left as `build/`, so **the Cloudflare Pages
+project needs no change at all.**
+
+| | Before | After |
+|---|---|---|
+| `npm audit` | 58 — 3 critical, 29 high | 6, all dev-only |
+| `npm audit --omit=dev` | — | **0 vulnerabilities** |
+| Build time | ~40 s | **1.16 s** |
+| JS, gzipped | 377.25 kB | 375.55 kB |
+| Tests | 1, and it was broken | 16, all passing |
+
+**N10 — DISCOVERED: Tailwind has never run in production.**
+
+The deployed `main.d221ebf1.css` is 976 bytes and begins with the literal text
+`@tailwind base;@tailwind components;@tailwind utilities;`. The directives were
+shipped to the browser unprocessed. Grepping the live file for `.flex`,
+`.fixed`, `.absolute`, `.rounded`, `.z-30`, `.pointer-events-none` returns **0
+for every one**. Vite's output is 10,640 bytes and returns 1 for each.
+
+Every Tailwind class in the app has therefore been dead since the first deploy.
+Four components depend on them — 24 `className` attributes across `App.tsx`,
+`ControlsPanel`, `LoadingScreen`, `SectionLabel`. The layout classes are the
+damage:
+
+- `ControlsPanel` — `fixed bottom-6 left-1/2 z-30`, never fixed-positioned.
+- `SectionLabel` — `fixed top-6 left-1/2 z-40`, never fixed-positioned.
+- `App.tsx` overlay — `absolute top-0 left-0 w-full h-full z-10`, never
+  absolute. It sits in normal flow after a 100vh canvas, inside a `#root` that
+  is `height:100vh; overflow:hidden` — clipped out of view.
+
+This retires the "byte-comparable" criterion for Gate 0.5: the CSS **must**
+change, because it was wrong. It also revises defect B4 — the controls panel
+does not overflow a phone, it is not visible at all.
+
+⛔ **Gate 0.5 needs a look at the running site, not a diff.** The HUD is about
+to appear where it was always designed to sit, and nobody has ever seen it
+there. Run `npm run dev` and compare against production before this merges.
+
+**Next:** Phase 1 — mobile.
