@@ -11,6 +11,7 @@ import TravelFade from './components/UI/HUD/TravelFade';
 import WayHome from './components/UI/HUD/WayHome';
 import WorldMap from './components/UI/HUD/WorldMap';
 import ActivityBadge from './components/UI/HUD/ActivityBadge';
+import ConsentBanner from './components/UI/ConsentBanner';
 import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
@@ -106,6 +107,8 @@ const AppContent: React.FC = () => {
 
       {/* Covers it again, briefly, when going through a door. */}
       <TravelFade />
+
+      <ConsentBanner />
 
       <ContentPopup
         isOpen={popup.isOpen}

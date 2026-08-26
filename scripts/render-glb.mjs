@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const name = process.argv[2];
+const browser = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu'] });
+const page = await browser.newPage({ viewport: { width: 700, height: 700 } });
+page.on('console', (m) => console.log('[pg]', m.type(), m.text().slice(0,200)));
+page.on('pageerror', (e) => console.log('[pgerr]', String(e).slice(0,300)));
+await page.goto(`http://localhost:3001/__glbview.html?prop=${name}`);
+await page.waitForFunction('window.__done !== undefined', { timeout: 60000 });
+console.log('title:', await page.title());
+await page.waitForTimeout(800);
+await page.screenshot({ path: `/tmp/glb-${name}.png` });
+await browser.close();
+console.log('rendered', name);

@@ -1,0 +1,24 @@
+<!-- dev-only GLB inspector; not linked from anywhere -->
+<html><body style="margin:0">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.179.1/build/three.module.js","three/addons/":"https://unpkg.com/three@0.179.1/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+const name = new URLSearchParams(location.search).get('prop') || 'poppy';
+const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(700,700); document.body.append(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x333333);
+const c = new THREE.PerspectiveCamera(45,1,0.1,1000);
+s.add(new THREE.AmbientLight(0xffffff,1.2));
+const d = new THREE.DirectionalLight(0xffffff,1.5); d.position.set(3,5,4); s.add(d);
+const dl = new DRACOLoader(); dl.setDecoderPath('https://unpkg.com/three@0.179.1/examples/jsm/libs/draco/');
+const l = new GLTFLoader(); l.setDRACOLoader(dl);
+l.load(`/props/${name}.glb`, (g)=>{
+  const o=g.scene; const box=new THREE.Box3().setFromObject(o);
+  const size=box.getSize(new THREE.Vector3()); const ctr=box.getCenter(new THREE.Vector3());
+  o.position.sub(ctr); s.add(o);
+  const m=Math.max(size.x,size.y,size.z);
+  c.position.set(m*0.9,m*0.55,m*1.15); c.lookAt(0,0,0);
+  r.render(s,c); window.__done=true;
+}, undefined, (e)=>{ document.title='ERR '+e; window.__done='err'; });
+</script></body></html>

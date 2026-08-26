@@ -75,8 +75,8 @@ export const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, 
           disappears behind the first hill, and the compass tells you the
           bearing but not what to look for. */}
       <mesh position={[0, 15, 0]}>
-        <boxGeometry args={[1.1, 18, 1.1]} />
-        <meshBasicMaterial color={0xEDE6D2} transparent opacity={0.5} />
+        <boxGeometry args={[0.45, 18, 0.45]} />
+        <meshBasicMaterial color={0xEDE6D2} transparent opacity={0.28} depthWrite={false} />
       </mesh>
     </group>
   );

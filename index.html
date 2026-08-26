@@ -1,18 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <!-- TODO(Phase 3): this fires unconditionally on load. It must move behind
-         Consent Mode v2 with all four signals defaulted to denied. Left as-is
-         here deliberately so the Vite migration changes nothing but the build. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9DKDT8N2Z7"></script>
+    <!-- Consent Mode v2. The defaults MUST run before the tag loads: firing
+         them after creates the race the whole mechanism exists to prevent.
+         All four signals denied until the visitor says otherwise -- this is a
+         child's website and the bar is the strictest regime, everywhere. -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        wait_for_update: 500
+      });
+      try {
+        if (localStorage.getItem('ag.consent') === 'granted') {
+          gtag('consent', 'update', { analytics_storage: 'granted' });
+        }
+      } catch (e) {}
       gtag('js', new Date());
-
       gtag('config', 'G-9DKDT8N2Z7');
     </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9DKDT8N2Z7"></script>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -7,6 +7,7 @@ import Poppies from './Poppies';
 import Pagodas from './Pagodas';
 import PagodaFlora from './PagodaFlora';
 import Seeds from './Seeds';
+import HeroProp from './HeroProp';
 import SkyDome from './SkyDome';
 import PostFX from '../PostFX';
 import { ReturnDoor } from './Dimension';
@@ -62,11 +63,13 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
   const arrival = useMemo(() => {
     if (!field) return null;
     const spawn = new THREE.Vector3(0, field.heightAt(0, 0), 0);
-    const back = new THREE.Vector3(
-      -Math.sin(ARRIVAL_HEADING) * DOOR_BEHIND,
-      0,
-      -Math.cos(ARRIVAL_HEADING) * DOOR_BEHIND
-    );
+    // Behind AND off to the side. Dead astern it sits exactly on the camera
+    // axis (camera arrives 22 units behind the player), so every arrival shot
+    // framed the doorway's back and its beacon dead centre -- misdiagnosed
+    // twice as a broken hero prop before anyone checked what it actually was.
+    // Just past the camera's arrival distance (22), so the doorway is fully
+    // out of the opening frame; the compass carries the 26m.
+    const back = new THREE.Vector3(6, 0, DOOR_BEHIND + 15);
     back.y = field.heightAt(back.x, back.z);
     return { spawn, door: back };
   }, [field]);
@@ -140,6 +143,20 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
       {spec.structure.kind === 'flower' && <Grass spec={spec} field={field} />}
       {spec.structure.kind === 'flower' && <Poppies spec={spec} field={field} />}
       {spec.structure.kind === 'flower' && <Seeds spec={spec} field={field} />}
+      {/* The lore's named landmark, at the far edge of the arrival clearing so
+          it is the first thing in frame and never on top of the player. */}
+      {/* The named landmarks, generated from the paintings themselves.
+          The poppy is a RELIEF -- the bloom's impasto given depth -- so it must
+          FACE the arrival: viewed from behind its beige backing reads as a
+          planter, which is exactly what the first placement showed and the
+          fidelity log originally misdiagnosed as an invented pot. yaw=PI turns
+          the painting toward the door. */}
+      {slug === 'poppy' && (
+        <HeroProp url="/props/poppy.glb" position={[14, field.heightAt(14, -52), -52]} height={26} yaw={Math.PI + 0.25} />
+      )}
+      {slug === 'pagoda' && (
+        <HeroProp url="/props/pagoda.glb" position={[-20, field.heightAt(-20, -85), -85]} height={56} yaw={Math.PI + 0.15} />
+      )}
       {spec.structure.kind === 'pillar' && (
         <>
           <Pagodas spec={spec} field={field} />
