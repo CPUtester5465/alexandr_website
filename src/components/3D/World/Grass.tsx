@@ -132,6 +132,10 @@ const Grass: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ spec, fi
     mesh.instanceMatrix.needsUpdate = true;
     mesh.count = CAPACITY;
     mesh.frustumCulled = false;
+    // The camera's spring arm raycasts the whole scene every frame. Fishing
+    // a ray through 46k blades is pure CPU waste and can yank the camera in
+    // on a blade, so grass opts out of raycasting entirely.
+    mesh.raycast = () => {};
     slotOf.current.clear();
     freeSlots.current = Array.from({ length: SLOTS }, (_, i) => i);
     return () => {

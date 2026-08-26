@@ -90,7 +90,11 @@ const Poppies: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ spec, 
       );
     }
     for (const mesh of [stemRef.current, petalRef.current, coreRef.current]) {
-      if (mesh) mesh.frustumCulled = false;
+      if (mesh) {
+        mesh.frustumCulled = false;
+        // Same opt-out as the grass: the camera arm must not catch on flowers.
+        mesh.raycast = () => {};
+      }
     }
     builtFor.current = null;
     return () => {
