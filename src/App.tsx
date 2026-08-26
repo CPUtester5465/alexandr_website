@@ -1,6 +1,5 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-// import './App.css'; // Removed - using Tailwind CSS
 
 // UI Components
 import LoadingScreen from './components/UI/HUD/LoadingScreen';
