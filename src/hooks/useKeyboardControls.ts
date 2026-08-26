@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { controlState } from '../state/controlState';
+import { controlState, engageInput, releaseInput } from '../state/controlState';
 
 /**
  * Keyboard movement. WASD and the arrow keys, space to jump.
@@ -21,6 +21,7 @@ const MOVEMENT_KEYS = [...FORWARD, ...BACK, ...LEFT, ...RIGHT];
 export function useKeyboardControls(): void {
   useEffect(() => {
     const held = new Set<string>();
+    let engaged = false;
 
     const recomputeAxis = () => {
       let x = 0;
@@ -33,6 +34,18 @@ export function useKeyboardControls(): void {
       controlState.moveAxis.set(x, y);
       // Diagonals would otherwise be 41% faster than the cardinals.
       if (controlState.moveAxis.lengthSq() > 1) controlState.moveAxis.normalize();
+
+      // Freeze the input frame for as long as a key is down, for the same
+      // reason the thumb does -- otherwise holding W while the camera swings
+      // behind you turns W into a slow circle.
+      const moving = x !== 0 || y !== 0;
+      if (moving && !engaged) {
+        engageInput();
+        engaged = true;
+      } else if (!moving && engaged) {
+        releaseInput();
+        engaged = false;
+      }
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -81,6 +94,7 @@ export function useKeyboardControls(): void {
       window.removeEventListener('blur', onBlur);
       held.clear();
       controlState.moveAxis.set(0, 0);
+      if (engaged) releaseInput();
     };
   }, []);
 }

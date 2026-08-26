@@ -4,7 +4,7 @@ import { COLORS } from '../../../utils/constants';
 
 const Skybox: React.FC = () => {
   return (
-    <Sphere args={[500, 32, 32]}>
+    <Sphere args={[500, 32, 32]} userData={{ cameraTransparent: true }}>
       <meshBasicMaterial 
         color={COLORS.SKY} 
         side={2} // BackSide equivalent 

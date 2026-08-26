@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { headingFromCameraSpace, shortestAngleTo, controlState, clearSteering, resetControlState } from './controlState';
+import {
+  headingFromCameraSpace,
+  shortestAngleTo,
+  controlState,
+  clearSteering,
+  engageInput,
+  releaseInput,
+  resetControlState
+} from './controlState';
 
 /**
  * The steering maths. Everything the character does is built on these two
@@ -65,5 +73,41 @@ describe('clearSteering', () => {
     controlState.heading = 1.5;
     clearSteering();
     expect(controlState.heading).toBe(1.5);
+  });
+});
+
+describe('engageInput / releaseInput -- the two-yaw freeze', () => {
+  it('freezes the input frame at the camera yaw when a hold begins', () => {
+    controlState.cameraYaw = 1.2;
+    engageInput();
+    controlState.cameraYaw = 2.9;          // the camera swings behind him
+    expect(controlState.inputYaw).toBe(1.2); // the direction under the thumb does not move
+  });
+
+  it('does not re-base when a second input joins an existing hold', () => {
+    // Pressing W while already steering with a thumb must not swivel the
+    // direction the thumb is asking for.
+    controlState.cameraYaw = 0.5;
+    engageInput();
+    controlState.cameraYaw = 3.0;
+    engageInput();
+    expect(controlState.inputYaw).toBe(0.5);
+  });
+
+  it('resyncs only when the last input lets go', () => {
+    controlState.cameraYaw = 0.5;
+    engageInput();
+    engageInput();
+    controlState.cameraYaw = 3.0;
+    releaseInput();
+    expect(controlState.inputYaw).toBe(0.5);
+    releaseInput();
+    expect(controlState.inputYaw).toBe(3.0);
+  });
+
+  it('cannot go negative if a release arrives without a hold', () => {
+    releaseInput();
+    releaseInput();
+    expect(controlState.activeInputs).toBe(0);
   });
 });

@@ -79,7 +79,19 @@ export const CAMERA_CONFIG = {
   /** Pitch is clamped so the camera never dives below the ground plane. */
   MIN_PITCH: 0.12,
   MAX_PITCH: 1.15,
-  INITIAL_PITCH: 0.58
+  INITIAL_PITCH: 0.58,
+
+  /**
+   * Auto-follow. The camera swings behind the direction of travel on its own;
+   * touching it by hand suspends that for MANUAL_AUTHORITY_S.
+   */
+  FOLLOW_DEAD_ZONE: 0.28,      // radians of slack before it starts to swing
+  FOLLOW_RATE: 2.4,            // how hard it pulls, per second
+  MANUAL_AUTHORITY_S: 2.5,
+  /** Look-ahead: how far in front of him the camera aims, at full speed. */
+  LOOK_AHEAD: 3.2,
+  /** Keep this much clear between the camera and whatever it hit. */
+  COLLISION_MARGIN: 0.55
 };
 
 // Proximity detection

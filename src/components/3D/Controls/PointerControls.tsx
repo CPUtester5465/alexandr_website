@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { clearSteering, controlState, headingFromCameraSpace } from '../../../state/controlState';
+import {
+  clearSteering,
+  controlState,
+  engageInput,
+  headingFromCameraSpace,
+  releaseInput
+} from '../../../state/controlState';
 import { CAMERA_CONFIG, GESTURE } from '../../../utils/constants';
 
 /**
@@ -80,7 +86,9 @@ const PointerControls: React.FC = () => {
       1
     );
     // Screen y grows downward; forward on the stick is negative y.
-    controlState.desiredHeading = headingFromCameraSpace(dx, -dy, controlState.cameraYaw);
+    // inputYaw, not cameraYaw: the frame is frozen for the duration of the
+    // hold so the auto-following camera cannot feed back into the bearing.
+    controlState.desiredHeading = headingFromCameraSpace(dx, -dy, controlState.inputYaw);
   });
 
   useEffect(() => {
@@ -106,12 +114,21 @@ const PointerControls: React.FC = () => {
       return only;
     };
 
+    let steerEngaged = false;
     const refreshSteer = () => {
       steerPointer = findSteerPointer();
+      if (steerPointer && !steerEngaged) {
+        engageInput();
+        steerEngaged = true;
+      } else if (!steerPointer && steerEngaged) {
+        releaseInput();
+        steerEngaged = false;
+      }
       if (!steerPointer) clearSteering();
     };
 
     const orbit = (dx: number, dy: number) => {
+      if (dx !== 0 || dy !== 0) controlState.manualCameraFor = CAMERA_CONFIG.MANUAL_AUTHORITY_S;
       controlState.cameraYaw -= dx * GESTURE.DRAG_SENSITIVITY;
       controlState.cameraPitch = THREE.MathUtils.clamp(
         controlState.cameraPitch + dy * GESTURE.DRAG_SENSITIVITY,
@@ -244,6 +261,7 @@ const PointerControls: React.FC = () => {
       window.removeEventListener('blur', clearSteering);
       pointers.clear();
       steerPointer = null;
+      if (steerEngaged) releaseInput();
       clearSteering();
     };
   }, [gl, camera]);

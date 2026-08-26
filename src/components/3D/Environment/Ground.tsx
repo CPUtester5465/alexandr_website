@@ -10,6 +10,7 @@ const Ground: React.FC = () => {
         args={[WORLD_SIZE, WORLD_SIZE]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
+        userData={{ cameraTransparent: true }}
       >
         <meshLambertMaterial color={COLORS.GROUND} side={2} />
       </Plane>

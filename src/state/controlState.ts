@@ -42,6 +42,25 @@ export interface ControlState {
   cameraPitch: number;
   cameraDistance: number;
 
+  /**
+   * The frame screen-space input is interpreted in. Frozen for as long as any
+   * movement input is held, then resynced to cameraYaw.
+   *
+   * This is what stops the camera and the character chasing each other. The
+   * heading is derived from a camera basis; if the camera also auto-follows the
+   * heading, yaw turns the bearing, the bearing turns the heading, the heading
+   * turns the yaw, and he pirouettes on the spot forever. Nothing the camera
+   * does during a gesture can change the frame that gesture is read in.
+   */
+  inputYaw: number;
+  /** How many inputs are currently held. inputYaw is frozen while above zero. */
+  activeInputs: number;
+  /**
+   * Seconds of manual camera authority left. Set when the visitor moves the
+   * camera themselves; auto-follow stays out of the way until it runs down.
+   */
+  manualCameraFor: number;
+
   /** Set by a double tap or the space bar; cleared once the jump is applied. */
   jumpQueued: boolean;
 }
@@ -56,8 +75,31 @@ export const controlState: ControlState = {
   cameraYaw: 0,
   cameraPitch: CAMERA_CONFIG.INITIAL_PITCH,
   cameraDistance: CAMERA_CONFIG.DISTANCE,
+  inputYaw: 0,
+  activeInputs: 0,
+  manualCameraFor: 0,
   jumpQueued: false
 };
+
+/**
+ * Take hold of the controls. Freezes the input frame on the first hold and
+ * leaves it alone for any nested ones, so pressing W while already steering
+ * with a thumb does not re-base the direction under your finger.
+ */
+export function engageInput(): void {
+  if (controlState.activeInputs === 0) {
+    controlState.inputYaw = controlState.cameraYaw;
+  }
+  controlState.activeInputs += 1;
+}
+
+/** Let go. The input frame resyncs to wherever the camera has ended up. */
+export function releaseInput(): void {
+  controlState.activeInputs = Math.max(0, controlState.activeInputs - 1);
+  if (controlState.activeInputs === 0) {
+    controlState.inputYaw = controlState.cameraYaw;
+  }
+}
 
 /** Stop steering. Called on pointer release, key release and focus loss. */
 export function clearSteering(): void {
@@ -76,6 +118,9 @@ export function resetControlState(): void {
   controlState.cameraYaw = 0;
   controlState.cameraPitch = CAMERA_CONFIG.INITIAL_PITCH;
   controlState.cameraDistance = CAMERA_CONFIG.DISTANCE;
+  controlState.inputYaw = 0;
+  controlState.activeInputs = 0;
+  controlState.manualCameraFor = 0;
   controlState.jumpQueued = false;
 }
 

@@ -49,6 +49,7 @@ const LookPad: React.FC = () => {
       lastX = e.clientX;
       lastY = e.clientY;
 
+      controlState.manualCameraFor = CAMERA_CONFIG.MANUAL_AUTHORITY_S;
       controlState.cameraYaw -= dx * GESTURE.DRAG_SENSITIVITY * 1.6;
       controlState.cameraPitch = Math.min(
         CAMERA_CONFIG.MAX_PITCH,

@@ -75,7 +75,7 @@ const Player: React.FC = () => {
 
     const axis = controlState.moveAxis;
     if (axis.lengthSq() > 0.0001) {
-      requestedHeading = headingFromCameraSpace(axis.x, axis.y, controlState.cameraYaw);
+      requestedHeading = headingFromCameraSpace(axis.x, axis.y, controlState.inputYaw);
       requestedThrottle = Math.min(axis.length(), 1);
     } else if (controlState.desiredHeading !== null) {
       requestedHeading = controlState.desiredHeading;

@@ -1,37 +1,76 @@
-import { useFrame } from '@react-three/fiber';
+import { useMemo } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { controlState } from '../../../state/controlState';
-import { CAMERA_CONFIG, MAX_FRAME_DELTA } from '../../../utils/constants';
+import { controlState, shortestAngleTo } from '../../../state/controlState';
+import { CAMERA_CONFIG, MAX_FRAME_DELTA, PLAYER_CONFIG } from '../../../utils/constants';
 
 /**
- * Third-person camera that orbits the player.
+ * The camera, which nobody should have to operate.
  *
- * It used to be nailed to a constant offset of (0, 8, 12) and could not turn at
- * all, on any device -- you saw the world from exactly one angle for the whole
- * visit. Yaw, pitch and distance now come from `controlState`, which
- * PointerControls writes on drag, pinch and wheel.
+ * Four jobs, in the order they matter:
  *
- * The follow is frame-rate independent. `lerp(x, 0.05)` per frame reaches a
- * different place on a 60 Hz laptop than on a 120 Hz phone; the exponential
- * form below reaches the same place per second on both.
+ *   1. Never end up inside anything. A spring arm casts from the player out to
+ *      where the camera wants to be and pulls it in if the way is blocked.
+ *      Without this, any world with a wall in it puts you inside the wall.
+ *   2. Swing behind the direction of travel, damped, with a dead zone so small
+ *      course corrections do not slew the frame.
+ *   3. Look where he is going, not where he is -- the aim point leads him along
+ *      his heading in proportion to speed.
+ *   4. Get out of the way when someone takes hold of it, and quietly come back.
+ *
+ * Auto-follow is only safe because of the two-yaw split in controlState: the
+ * heading is read in `inputYaw`, which is frozen while an input is held, so
+ * nothing this file does can feed back into where the character is trying to go.
+ * Without that the two chase each other and he spins on the spot forever.
  */
 
-// Re-exported because the sections and useCurrentSection have always imported
-// the player position from this file. The value itself now lives in state.
 export { globalPlayerPosition } from '../../../state/controlState';
 
-const SMOOTH_PER_SECOND = 0.05;
+/** Approach per second, so the follow feels the same at 60 Hz and 120 Hz. */
+const POSITION_SMOOTH = 0.0009;
+const AIM_SMOOTH = 0.0001;
 
 const desired = new THREE.Vector3();
-const lookAt = new THREE.Vector3();
+const aim = new THREE.Vector3();
+const smoothedAim = new THREE.Vector3();
+const toCamera = new THREE.Vector3();
 
 const CameraController: React.FC = () => {
+  const { scene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+
   useFrame(({ camera }, rawDelta) => {
     const delta = Math.min(rawDelta, MAX_FRAME_DELTA);
-    const { playerPosition, cameraYaw, cameraPitch, cameraDistance } = controlState;
+    const { playerPosition, heading, speed } = controlState;
 
-    // Spherical orbit around the player. Pitch is already clamped away from the
-    // horizon and the ground by PointerControls.
+    // --- 4. manual authority ------------------------------------------------
+    if (controlState.manualCameraFor > 0) {
+      controlState.manualCameraFor = Math.max(0, controlState.manualCameraFor - delta);
+    }
+
+    // --- 2. swing behind him ------------------------------------------------
+    // The camera sits at (sin yaw, cos yaw) from the player, so to be *behind*
+    // someone walking along `heading` it wants to be half a turn round from it.
+    if (controlState.manualCameraFor === 0 && speed > PLAYER_CONFIG.SPEED * 0.08) {
+      const offBy = shortestAngleTo(controlState.cameraYaw, heading + Math.PI);
+      const slack = CAMERA_CONFIG.FOLLOW_DEAD_ZONE;
+      if (Math.abs(offBy) > slack) {
+        const past = offBy - Math.sign(offBy) * slack;
+        controlState.cameraYaw += past * Math.min(1, CAMERA_CONFIG.FOLLOW_RATE * delta);
+      }
+    }
+
+    // --- 3. aim ahead of him ------------------------------------------------
+    const lead = (speed / PLAYER_CONFIG.SPEED) * CAMERA_CONFIG.LOOK_AHEAD;
+    aim.copy(playerPosition).add(CAMERA_CONFIG.LOOK_AT_OFFSET);
+    aim.x += Math.sin(heading) * lead;
+    aim.z += Math.cos(heading) * lead;
+    // Damped separately from the position, and more slowly, so a sharp turn
+    // does not whip the horizon across the screen.
+    smoothedAim.lerp(aim, 1 - Math.pow(AIM_SMOOTH, delta));
+
+    // --- where it would like to be ------------------------------------------
+    const { cameraYaw, cameraPitch, cameraDistance } = controlState;
     const horizontal = Math.cos(cameraPitch) * cameraDistance;
     desired.set(
       playerPosition.x + Math.sin(cameraYaw) * horizontal,
@@ -39,14 +78,28 @@ const CameraController: React.FC = () => {
       playerPosition.z + Math.cos(cameraYaw) * horizontal
     );
 
-    // Never let the camera end up underground, however extreme the pitch.
-    desired.y = Math.max(desired.y, 1.5);
+    // --- 1. spring arm ------------------------------------------------------
+    // Cast from the player outward. Anything in the way pulls the camera in to
+    // just short of it rather than letting it pass through.
+    toCamera.copy(desired).sub(playerPosition);
+    const reach = toCamera.length();
+    if (reach > 0.001) {
+      toCamera.divideScalar(reach);
+      raycaster.set(playerPosition, toCamera);
+      raycaster.far = reach;
+      const blockers = raycaster.intersectObjects(scene.children, true)
+        .filter((hit) => hit.object.userData?.cameraTransparent !== true && hit.distance > 0.05);
+      if (blockers.length > 0) {
+        const clear = Math.max(1.2, blockers[0].distance - CAMERA_CONFIG.COLLISION_MARGIN);
+        desired.copy(playerPosition).addScaledVector(toCamera, clear);
+      }
+    }
 
-    const t = 1 - Math.pow(SMOOTH_PER_SECOND, delta);
-    camera.position.lerp(desired, t);
+    // Never underground, however hard the pitch is pushed.
+    desired.y = Math.max(desired.y, 1.2);
 
-    lookAt.copy(playerPosition).add(CAMERA_CONFIG.LOOK_AT_OFFSET);
-    camera.lookAt(lookAt);
+    camera.position.lerp(desired, 1 - Math.pow(POSITION_SMOOTH, delta));
+    camera.lookAt(smoothedAim);
   });
 
   return null;
