@@ -11,6 +11,7 @@ import { useChunkWindow } from '../../../hooks/useChunkWindow';
 import { CHUNK } from '../../../world/chunk';
 import { controlState } from '../../../state/controlState';
 import { markDone, isDone } from '../../../state/activityState';
+import { shrineBell } from '../../../state/audio';
 
 /**
  * The valley between the towers, which Tim found empty -- because it was.
@@ -98,6 +99,7 @@ const PagodaFlora: React.FC<{ spec: DimensionSpec; field: SmoothField }> = ({ sp
       );
       if (d < 3.2) {
         if (markDone(spec.slug, key)) {
+          shrineBell();
           litVersion.current++;
           bump();
         }

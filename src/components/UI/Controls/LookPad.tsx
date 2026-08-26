@@ -1,20 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { controlState } from '../../../state/controlState';
-import { CAMERA_CONFIG, GESTURE } from '../../../utils/constants';
 
 /**
- * A place to put your other thumb, to look around.
+ * The look joystick -- a real one this time.
  *
- * One finger on the world steers, so the camera had nowhere to go on a phone
- * except a two-finger drag -- which works, and which nobody discovers. This is
- * the second thumb, in the corner where it already rests.
+ * Deflection is a RATE: hold the knob left and the camera keeps turning left
+ * until you let go. The camera consumes controlState.lookAxis every frame at
+ * up to 2.6 rad/s. The previous version rotated only while the finger MOVED
+ * (a trackpad in a joystick's clothing), so holding it deflected did nothing;
+ * Tim caught it on a phone within a session.
  *
- * It writes straight into `controlState`, the same object the gesture handler
- * and the camera share, so there is exactly one camera and one way it moves.
+ * A small dead zone keeps a resting thumb from drifting the camera.
  *
- * PROVISIONAL STYLING. The HUD is being redrawn once the design direction is
- * settled. The behaviour is not provisional.
+ * PROVISIONAL STYLING.
  */
+const RADIUS = 34;       // knob travel in px
+const DEAD_ZONE = 0.14;  // fraction of deflection ignored
+
 const LookPad: React.FC = () => {
   const padRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
@@ -25,48 +27,57 @@ const LookPad: React.FC = () => {
     if (!pad) return;
 
     let pointerId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
 
     const setKnob = (x: number, y: number) => {
       if (knob) knob.style.transform = `translate(${x}px, ${y}px)`;
     };
 
+    const deflect = (clientX: number, clientY: number) => {
+      const rect = pad.getBoundingClientRect();
+      let dx = clientX - (rect.left + rect.width / 2);
+      let dy = clientY - (rect.top + rect.height / 2);
+      const length = Math.hypot(dx, dy);
+      if (length > RADIUS) {
+        dx = (dx / length) * RADIUS;
+        dy = (dy / length) * RADIUS;
+      }
+      setKnob(dx, dy);
+      let ax = dx / RADIUS;
+      let ay = dy / RADIUS;
+      const mag = Math.hypot(ax, ay);
+      if (mag < DEAD_ZONE) {
+        ax = 0; ay = 0;
+      } else {
+        // Rescale so the usable range starts at zero past the dead zone.
+        const scaled = (mag - DEAD_ZONE) / (1 - DEAD_ZONE);
+        ax = (ax / mag) * scaled;
+        ay = (ay / mag) * scaled;
+      }
+      controlState.lookAxis.set(ax, ay);
+    };
+
+    const release = () => {
+      pointerId = null;
+      controlState.lookAxis.set(0, 0);
+      setKnob(0, 0);
+    };
+
     const onDown = (e: PointerEvent) => {
       if (pointerId !== null) return;
       pointerId = e.pointerId;
-      lastX = e.clientX;
-      lastY = e.clientY;
       pad.setPointerCapture(e.pointerId);
+      deflect(e.clientX, e.clientY);
       e.preventDefault();
       e.stopPropagation();
     };
-
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-
-      controlState.manualCameraFor = CAMERA_CONFIG.MANUAL_AUTHORITY_S;
-      controlState.cameraYaw -= dx * GESTURE.DRAG_SENSITIVITY * 1.6;
-      controlState.cameraPitch = Math.min(
-        CAMERA_CONFIG.MAX_PITCH,
-        Math.max(CAMERA_CONFIG.MIN_PITCH, controlState.cameraPitch + dy * GESTURE.DRAG_SENSITIVITY * 1.6)
-      );
-
-      const rect = pad.getBoundingClientRect();
-      const offsetX = Math.max(-26, Math.min(26, e.clientX - (rect.left + rect.width / 2)));
-      const offsetY = Math.max(-26, Math.min(26, e.clientY - (rect.top + rect.height / 2)));
-      setKnob(offsetX, offsetY);
+      deflect(e.clientX, e.clientY);
       e.preventDefault();
     };
-
     const onUp = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
-      pointerId = null;
-      setKnob(0, 0);
+      release();
     };
 
     pad.addEventListener('pointerdown', onDown);
@@ -74,6 +85,7 @@ const LookPad: React.FC = () => {
     pad.addEventListener('pointerup', onUp);
     pad.addEventListener('pointercancel', onUp);
     return () => {
+      release();
       pad.removeEventListener('pointerdown', onDown);
       pad.removeEventListener('pointermove', onMove);
       pad.removeEventListener('pointerup', onUp);
@@ -89,35 +101,29 @@ const LookPad: React.FC = () => {
       style={{
         right: 'calc(env(safe-area-inset-right, 0px) + 18px)',
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-        // 96px: comfortably above the 44px minimum a thumb reliably hits.
         width: '96px',
         height: '96px',
         touchAction: 'none',
-        background: 'rgba(255,255,255,0.16)',
-        border: '1px solid rgba(255,255,255,0.5)',
+        background: 'rgba(26, 20, 16, 0.35)',
+        border: '1px solid rgba(237, 230, 210, 0.5)',
         cursor: 'grab'
       }}
     >
       <div
         ref={knobRef}
         style={{
-          width: '34px',
-          height: '34px',
+          width: '38px',
+          height: '38px',
           borderRadius: '999px',
-          background: 'rgba(255,255,255,0.85)',
-          transition: 'transform 90ms ease-out',
+          background: 'rgba(237, 230, 210, 0.9)',
           pointerEvents: 'none'
         }}
       />
       <span
         style={{
-          position: 'absolute',
-          bottom: '-19px',
-          fontSize: '10px',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.9)',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+          position: 'absolute', bottom: '-19px', fontSize: '10px',
+          letterSpacing: '0.08em', textTransform: 'uppercase',
+          color: 'rgba(237, 230, 210, 0.9)', textShadow: '0 1px 2px rgba(0,0,0,0.5)',
           pointerEvents: 'none'
         }}
       >

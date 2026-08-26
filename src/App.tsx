@@ -12,6 +12,7 @@ import WayHome from './components/UI/HUD/WayHome';
 import WorldMap from './components/UI/HUD/WorldMap';
 import ActivityBadge from './components/UI/HUD/ActivityBadge';
 import ConsentBanner from './components/UI/ConsentBanner';
+import WorldHint from './components/UI/HUD/WorldHint';
 import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
@@ -86,6 +87,7 @@ const AppContent: React.FC = () => {
         <DoorLabel />
         <WayHome />
         <ActivityBadge />
+        <WorldHint />
         <div className="pointer-events-auto">
           <LocaleToggle />
         </div>

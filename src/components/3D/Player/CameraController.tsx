@@ -78,6 +78,18 @@ const CameraController: React.FC = () => {
     const delta = Math.min(rawDelta, MAX_FRAME_DELTA);
     const { playerPosition, heading } = controlState;
 
+    // --- 0. the look joystick: a rate, applied per frame --------------------
+    const look = controlState.lookAxis;
+    if (look.lengthSq() > 0.0004) {
+      const RATE = 2.6; // radians/second at full deflection
+      controlState.cameraYaw -= look.x * RATE * delta;
+      controlState.cameraPitch = Math.min(
+        CAMERA_CONFIG.MAX_PITCH,
+        Math.max(CAMERA_CONFIG.MIN_PITCH, controlState.cameraPitch + look.y * RATE * 0.7 * delta)
+      );
+      controlState.manualCameraFor = CAMERA_CONFIG.MANUAL_AUTHORITY_S;
+    }
+
     // --- 5. manual authority ------------------------------------------------
     if (controlState.manualCameraFor > 0) {
       controlState.manualCameraFor = Math.max(0, controlState.manualCameraFor - delta);

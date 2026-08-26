@@ -61,6 +61,15 @@ export interface ControlState {
    */
   manualCameraFor: number;
 
+  /**
+   * Held look-joystick deflection, -1..1 each axis. A joystick is a RATE
+   * control: deflection means "keep turning this fast", applied per-frame by
+   * the camera. The first LookPad treated it as a trackpad -- rotation only on
+   * finger MOVEMENT -- so holding it deflected did nothing, which on a phone
+   * reads as broken. It was.
+   */
+  lookAxis: THREE.Vector2;
+
   /** Set by a double tap or the space bar; cleared once the jump is applied. */
   jumpQueued: boolean;
 }
@@ -78,6 +87,7 @@ export const controlState: ControlState = {
   inputYaw: 0,
   activeInputs: 0,
   manualCameraFor: 0,
+  lookAxis: new THREE.Vector2(0, 0),
   jumpQueued: false
 };
 
@@ -121,6 +131,7 @@ export function resetControlState(): void {
   controlState.inputYaw = 0;
   controlState.activeInputs = 0;
   controlState.manualCameraFor = 0;
+  controlState.lookAxis.set(0, 0);
   controlState.jumpQueued = false;
 }
 

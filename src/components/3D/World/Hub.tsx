@@ -12,6 +12,7 @@ import { setNearestDoor } from '../../../state/hubState';
 import { travelTo, useWorld } from '../../../state/worldState';
 import { useLocale, pick } from '../../../state/locale';
 import PostFX from '../PostFX';
+import PortalSurface from './PortalSurface';
 import { BLOOM_LAYER } from '../PostFX';
 import { dimensionBySlug } from '../../../world/dimensions/registry';
 
@@ -130,35 +131,6 @@ const HungPainting: React.FC<GlowProps> = ({ door }) => {
   );
 };
 
-/**
- * A slim emissive panel in the doorway on the bloom layer, so the door's
- * sampled colour carries as a glow once the post stack runs -- point lights
- * alone cannot bloom because bloom selects meshes.
- */
-const DoorBloomPanel: React.FC<GlowProps> = ({ door }) => {
-  const inward = door.facing.clone().multiplyScalar(-1);
-  return (
-    <mesh
-      position={[
-        door.position.x - inward.x * BLOCK * 1.2,
-        BLOCK * 3.2,
-        door.position.z - inward.z * BLOCK * 1.2
-      ]}
-      rotation={[0, Math.atan2(inward.x, inward.z), 0]}
-      layers-mask={(1 << 0) | (1 << BLOOM_LAYER)}
-    >
-      <planeGeometry args={[3.6, 4.9]} />
-      <meshBasicMaterial
-        color={door.colour}
-        transparent
-        opacity={0.26}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-};
-
 const DoorGlow: React.FC<GlowProps> = ({ door }) => {
   const light = useRef<THREE.PointLight>(null);
 
@@ -184,6 +156,86 @@ const DoorGlow: React.FC<GlowProps> = ({ door }) => {
         door.position.z - door.facing.z * BLOCK
       ]}
     />
+  );
+};
+
+const RoomDressing: React.FC = () => {
+  const motes = useMemo(() => {
+    const count = 220;
+    const positions = new Float32Array(count * 3);
+    let h = 12345;
+    const rand = () => {
+      h = Math.imul(h ^ (h >>> 15), h | 1) >>> 0;
+      return (h % 10000) / 10000;
+    };
+    for (let i = 0; i < count; i++) {
+      const angle = rand() * Math.PI * 2;
+      const radius = rand() * (HUB.radius - 3) * BLOCK;
+      positions[i * 3] = Math.sin(angle) * radius;
+      positions[i * 3 + 1] = 2 + rand() * 13;
+      positions[i * 3 + 2] = Math.cos(angle) * radius;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geometry;
+  }, []);
+  const motesRef = useRef<THREE.Points>(null);
+
+  useFrame(({ clock }) => {
+    if (motesRef.current) motesRef.current.rotation.y = clock.getElapsedTime() * 0.008;
+  });
+
+  const beams = useMemo(() => {
+    const wood = new THREE.MeshLambertMaterial({ color: 0x4A3524 });
+    const unit = new THREE.BoxGeometry(1, 1, 1);
+    const mesh = new THREE.InstancedMesh(unit, wood, 9);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < 9; i++) {
+      const angle = (i / 9) * Math.PI * 2;
+      q.setFromAxisAngle(up, angle);
+      m.compose(new THREE.Vector3(0, 19.2, 0), q,
+        new THREE.Vector3(HUB.radius * 2 * BLOCK - 6, 0.8, 1.1));
+      mesh.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    return mesh;
+  }, []);
+
+  const lamps = useMemo(() => {
+    const warm = new THREE.MeshBasicMaterial({ color: 0xF3D9A4 });
+    const sphere = new THREE.SphereGeometry(0.45, 10, 8);
+    const mesh = new THREE.InstancedMesh(sphere, warm, 6);
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + 0.26;
+      const radius = HUB.radius * BLOCK * 0.55;
+      m.makeTranslation(Math.sin(angle) * radius, 16.5, Math.cos(angle) * radius);
+      mesh.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.layers.enable(BLOOM_LAYER);
+    return mesh;
+  }, []);
+
+  return (
+    <group>
+      <primitive object={beams} />
+      <primitive object={lamps} />
+      {/* Rug ring around the centre, on his paper colour. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BLOCK + 0.06, 0]}>
+        <ringGeometry args={[7, 12.5, 48]} />
+        <meshLambertMaterial color={0x8A5A33} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BLOCK + 0.07, 0]}>
+        <ringGeometry args={[7.6, 11.9, 48]} />
+        <meshLambertMaterial color={0xC8B392} />
+      </mesh>
+      <points ref={motesRef} geometry={motes}>
+        <pointsMaterial color={0xEDE6D2} size={0.14} transparent opacity={0.35} sizeAttenuation />
+      </points>
+    </group>
   );
 };
 
@@ -288,7 +340,7 @@ const Hub: React.FC = () => {
       {hub.doors.map((door) => (
         <React.Fragment key={door.slug}>
           <DoorGlow door={door} />
-          <DoorBloomPanel door={door} />
+          <PortalSurface door={door} />
           <DoorSign door={door} />
           {door.kind === 'painting' && <HungPainting door={door} />}
         </React.Fragment>
@@ -297,6 +349,11 @@ const Hub: React.FC = () => {
       {/* The same post stack the worlds run: bloom for the door glows, the
           grade pulled toward wood and paper instead of a painting. */}
       <PostFX palette={HUB_PALETTE} />
+
+      {/* The room's own furniture: ceiling beams radiating like a wheel,
+          warm hanging lamps that bloom, a rug ring at the centre, and slow
+          dust motes -- a study, not a corridor. All palette woods. */}
+      <RoomDressing />
 
       {/* Enough ambient that the room is never black, and no more -- the doors
           are supposed to be doing the lighting. */}
