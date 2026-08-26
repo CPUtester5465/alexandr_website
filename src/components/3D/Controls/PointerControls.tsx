@@ -1,30 +1,36 @@
 import { useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { controlState } from '../../../state/controlState';
-import { CAMERA_CONFIG, GESTURE, WORLD_BOUNDS } from '../../../utils/constants';
+import { clearSteering, controlState, headingFromCameraSpace } from '../../../state/controlState';
+import { CAMERA_CONFIG, GESTURE } from '../../../utils/constants';
 
 /**
- * Every pointer gesture in the world, handled at the DOM level.
+ * Every pointer gesture in the world.
  *
- *   tap          walk to that spot
- *   double tap   jump
- *   drag         look around
- *   pinch        move the camera in and out
- *   wheel        the same, for a mouse
+ *   press and hold   steer -- he drives that way and keeps going
+ *   double tap       jump
+ *   two fingers      look around, and pinch to zoom
+ *   right-drag       look around, with a mouse
+ *   wheel            zoom
  *
- * This deliberately does not use react-three-fiber's own pointer events. Tap
- * and drag start with the identical `pointerdown`, and the difference only
- * becomes clear on `pointerup` -- so the two gestures have to be resolved by
- * one piece of code that sees the whole sequence. Splitting them across r3f's
- * synthetic events and DOM listeners means racing on which fires first.
+ * Steering is a *bearing*, not a destination. Hold your thumb somewhere and he
+ * heads that way until you move it or let go; he does not stop on arrival,
+ * because there is no arrival. The bearing is measured from the player's own
+ * position on screen -- and since the camera follows him, he sits at roughly a
+ * fixed point, so a thumb held still yields a constant direction. That is what
+ * makes it feel like driving rather than clicking a waypoint.
  *
- * The ground is intersected mathematically against the y=0 plane rather than by
- * raycasting the scene, which is both exact and free: no traversal, and no
- * dependence on the ground mesh existing or being big enough.
+ * Two things this deliberately does NOT do.
+ *
+ * A floating stick anchored where the finger lands reads zero until you drag,
+ * so putting your thumb down does nothing -- the opposite of the behaviour
+ * wanted here.
+ *
+ * One finger never rotates the camera. If it did, the camera yaw would feed
+ * back into the bearing (which is computed from the camera basis), the bearing
+ * would rotate the camera further, and the player would spin on the spot
+ * forever. Looking around is two fingers, or the right mouse button.
  */
-
-const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
 interface ActivePointer {
   id: number;
@@ -34,17 +40,49 @@ interface ActivePointer {
   lastY: number;
   startedAt: number;
   moved: boolean;
+  isRightButton: boolean;
 }
 
+const playerScreen = new THREE.Vector3();
+
 const PointerControls: React.FC = () => {
-  const { gl, camera } = useThree();
+  const { gl, camera, size } = useThree();
+
+  // Steering is resolved every frame rather than on pointermove: the player
+  // keeps moving under a motionless thumb, so the bearing has to be recomputed
+  // even when no event fires.
+  useFrame(() => {
+    const steer = steerPointer;
+    if (!steer) return;
+
+    playerScreen.copy(controlState.playerPosition);
+    playerScreen.y += 1.4; // aim at his chest, not his feet
+    playerScreen.project(camera);
+
+    const px = ((playerScreen.x + 1) / 2) * size.width;
+    const py = ((1 - playerScreen.y) / 2) * size.height;
+
+    const dx = steer.lastX - px;
+    const dy = steer.lastY - py;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance < GESTURE.STEER_DEAD_ZONE_PX) {
+      controlState.throttle = 0;
+      return;
+    }
+
+    controlState.throttle = THREE.MathUtils.clamp(
+      (distance - GESTURE.STEER_DEAD_ZONE_PX) /
+        (GESTURE.STEER_FULL_THROTTLE_PX - GESTURE.STEER_DEAD_ZONE_PX),
+      0,
+      1
+    );
+    // Screen y grows downward; forward on the stick is negative y.
+    controlState.desiredHeading = headingFromCameraSpace(dx, -dy, controlState.cameraYaw);
+  });
 
   useEffect(() => {
     const el = gl.domElement;
-    const raycaster = new THREE.Raycaster();
-    const ndc = new THREE.Vector2();
-    const hit = new THREE.Vector3();
-
     const pointers = new Map<number, ActivePointer>();
     let lastTapAt = 0;
     let lastTapX = 0;
@@ -52,24 +90,40 @@ const PointerControls: React.FC = () => {
     let pinchStartDistance = 0;
     let pinchStartCameraDistance = 0;
 
-    /** Where does a screen point land on the ground? Null if it never does. */
-    const groundPointAt = (clientX: number, clientY: number): THREE.Vector3 | null => {
-      const rect = el.getBoundingClientRect();
-      ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(ndc, camera);
-      // Null when the ray points at or above the horizon, which is what a tap
-      // on the sky does. Walking to "infinitely far away" is not a thing.
-      if (!raycaster.ray.intersectPlane(GROUND_PLANE, hit)) return null;
-      return hit.clone();
-    };
-
     const distanceBetween = (a: ActivePointer, b: ActivePointer) =>
       Math.hypot(a.lastX - b.lastX, a.lastY - b.lastY);
 
+    /** The one pointer currently steering, if any. */
+    const findSteerPointer = (): ActivePointer | null => {
+      if (pointers.size !== 1) return null;
+      const only = pointers.values().next().value as ActivePointer;
+      return only.isRightButton ? null : only;
+    };
+
+    const refreshSteer = () => {
+      steerPointer = findSteerPointer();
+      if (!steerPointer) clearSteering();
+    };
+
+    const orbit = (dx: number, dy: number) => {
+      controlState.cameraYaw -= dx * GESTURE.DRAG_SENSITIVITY;
+      controlState.cameraPitch = THREE.MathUtils.clamp(
+        controlState.cameraPitch + dy * GESTURE.DRAG_SENSITIVITY,
+        CAMERA_CONFIG.MIN_PITCH,
+        CAMERA_CONFIG.MAX_PITCH
+      );
+    };
+
+    const zoomTo = (value: number) => {
+      controlState.cameraDistance = THREE.MathUtils.clamp(
+        value,
+        CAMERA_CONFIG.MIN_DISTANCE,
+        CAMERA_CONFIG.MAX_DISTANCE
+      );
+    };
+
     const onPointerDown = (e: PointerEvent) => {
-      // Ignore right/middle mouse buttons; they belong to the browser.
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
 
       el.setPointerCapture?.(e.pointerId);
       pointers.set(e.pointerId, {
@@ -79,7 +133,8 @@ const PointerControls: React.FC = () => {
         lastX: e.clientX,
         lastY: e.clientY,
         startedAt: performance.now(),
-        moved: false
+        moved: false,
+        isRightButton: e.pointerType === 'mouse' && e.button === 2
       });
 
       if (pointers.size === 2) {
@@ -87,6 +142,7 @@ const PointerControls: React.FC = () => {
         pinchStartDistance = distanceBetween(a, b);
         pinchStartCameraDistance = controlState.cameraDistance;
       }
+      refreshSteer();
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -97,34 +153,25 @@ const PointerControls: React.FC = () => {
       const dy = e.clientY - p.lastY;
       p.lastX = e.clientX;
       p.lastY = e.clientY;
-
       if (Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > GESTURE.TAP_SLOP_PX) {
         p.moved = true;
       }
 
       if (pointers.size >= 2) {
-        // Two fingers: pinch to zoom, and no looking around. Trying to do both
-        // at once with two fingers feels like a fight.
+        // Two fingers look and zoom; steering is suspended while they are down.
         const [a, b] = Array.from(pointers.values());
         const current = distanceBetween(a, b);
         if (pinchStartDistance > 0 && current > 0) {
-          controlState.cameraDistance = THREE.MathUtils.clamp(
-            pinchStartCameraDistance * (pinchStartDistance / current),
-            CAMERA_CONFIG.MIN_DISTANCE,
-            CAMERA_CONFIG.MAX_DISTANCE
-          );
+          zoomTo(pinchStartCameraDistance * (pinchStartDistance / current));
         }
+        // Orbit on the midpoint's travel, so a two-finger drag also looks.
+        orbit(dx / 2, dy / 2);
         return;
       }
 
-      if (!p.moved) return;
-
-      controlState.cameraYaw -= dx * GESTURE.DRAG_SENSITIVITY;
-      controlState.cameraPitch = THREE.MathUtils.clamp(
-        controlState.cameraPitch + dy * GESTURE.DRAG_SENSITIVITY,
-        CAMERA_CONFIG.MIN_PITCH,
-        CAMERA_CONFIG.MAX_PITCH
-      );
+      if (p.isRightButton) orbit(dx, dy);
+      // A single left/touch pointer steers, and steering is resolved in
+      // useFrame -- nothing to do here beyond recording the position above.
     };
 
     const endPointer = (e: PointerEvent) => {
@@ -133,10 +180,12 @@ const PointerControls: React.FC = () => {
       pointers.delete(e.pointerId);
       el.releasePointerCapture?.(e.pointerId);
       if (pointers.size < 2) pinchStartDistance = 0;
+      refreshSteer();
+
+      if (p.isRightButton) return;
 
       const heldFor = performance.now() - p.startedAt;
-      const isTap = !p.moved && heldFor < GESTURE.TAP_MAX_MS;
-      if (!isTap) return;
+      if (p.moved || heldFor >= GESTURE.TAP_MAX_MS) return;
 
       const now = performance.now();
       const isDoubleTap =
@@ -145,34 +194,25 @@ const PointerControls: React.FC = () => {
 
       if (isDoubleTap) {
         controlState.jumpQueued = true;
-        // Consume it, so a third tap starts a fresh pair rather than firing again.
-        lastTapAt = 0;
+        lastTapAt = 0; // consume, so a third tap starts a fresh pair
         return;
       }
 
       lastTapAt = now;
       lastTapX = e.clientX;
       lastTapY = e.clientY;
-
-      const target = groundPointAt(e.clientX, e.clientY);
-      if (!target) return;
-      target.x = THREE.MathUtils.clamp(target.x, WORLD_BOUNDS.MIN_X, WORLD_BOUNDS.MAX_X);
-      target.z = THREE.MathUtils.clamp(target.z, WORLD_BOUNDS.MIN_Z, WORLD_BOUNDS.MAX_Z);
-      target.y = 0;
-      controlState.moveTarget = target;
     };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      controlState.cameraDistance = THREE.MathUtils.clamp(
-        controlState.cameraDistance + e.deltaY * 0.02,
-        CAMERA_CONFIG.MIN_DISTANCE,
-        CAMERA_CONFIG.MAX_DISTANCE
-      );
+      zoomTo(controlState.cameraDistance + e.deltaY * 0.02);
     };
 
-    // touch-action:none stops the browser from claiming the gesture as a scroll
-    // or a page zoom before we ever see the second pointermove.
+    // Right-drag is a camera control here, so the menu must not interrupt it.
+    const onContextMenu = (e: Event) => e.preventDefault();
+
+    // Without this the browser claims the gesture as a scroll or a page zoom
+    // before the second pointermove ever arrives.
     const previousTouchAction = el.style.touchAction;
     el.style.touchAction = 'none';
 
@@ -181,6 +221,8 @@ const PointerControls: React.FC = () => {
     el.addEventListener('pointerup', endPointer);
     el.addEventListener('pointercancel', endPointer);
     el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('blur', clearSteering);
 
     return () => {
       el.style.touchAction = previousTouchAction;
@@ -189,10 +231,21 @@ const PointerControls: React.FC = () => {
       el.removeEventListener('pointerup', endPointer);
       el.removeEventListener('pointercancel', endPointer);
       el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('contextmenu', onContextMenu);
+      window.removeEventListener('blur', clearSteering);
+      pointers.clear();
+      steerPointer = null;
+      clearSteering();
     };
   }, [gl, camera]);
 
   return null;
 };
+
+/**
+ * Module-scoped so the frame loop and the event handlers share it without a
+ * re-render. There is only ever one PointerControls in the tree.
+ */
+let steerPointer: ActivePointer | null = null;
 
 export default PointerControls;

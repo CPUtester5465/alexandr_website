@@ -4,10 +4,10 @@ import { controlState } from '../state/controlState';
 /**
  * Keyboard movement. WASD and the arrow keys, space to jump.
  *
- * Writes into the same `moveAxis` the on-screen stick uses, so the character
- * only has to understand one kind of input. Pressing a key also cancels any
- * walk-to-here target: if you have taken hold of the controls, you did not mean
- * to keep walking to where you tapped a second ago.
+ * Writes a camera-space axis rather than a world heading, because the camera can
+ * be orbited with the right mouse button while W is still held -- "forward" has
+ * to keep meaning "away from the camera" as it turns. The character resolves the
+ * axis against the current camera every frame.
  */
 
 const FORWARD = ['w', 'arrowup'];
@@ -33,7 +33,6 @@ export function useKeyboardControls(): void {
       controlState.moveAxis.set(x, y);
       // Diagonals would otherwise be 41% faster than the cardinals.
       if (controlState.moveAxis.lengthSq() > 1) controlState.moveAxis.normalize();
-      if (x !== 0 || y !== 0) controlState.moveTarget = null;
     };
 
     const onKeyDown = (event: KeyboardEvent) => {

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import * as THREE from 'three';
 import { useKeyboardControls } from './useKeyboardControls';
 import { controlState, resetControlState } from '../state/controlState';
 
@@ -37,11 +36,15 @@ describe('useKeyboardControls', () => {
     unmount();
   });
 
-  it('cancels a walk-to-here target as soon as a key is pressed', () => {
+  it('overrides thumb steering, because reaching for keys is a change of mind', () => {
     const { unmount } = renderHook(() => useKeyboardControls());
-    controlState.moveTarget = new THREE.Vector3(10, 0, 10);
+    // The character resolves moveAxis first and only falls back to a held
+    // bearing, so a non-zero axis is what wins -- assert the axis is set while
+    // a stale bearing is still on the state.
+    controlState.desiredHeading = Math.PI;
+    controlState.throttle = 1;
     press('w');
-    expect(controlState.moveTarget).toBeNull();
+    expect(controlState.moveAxis.y).toBe(1);
     unmount();
   });
 

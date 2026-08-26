@@ -2,42 +2,63 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useLegoPlayer } from '../../../hooks/useLegoPlayer';
-import { controlState } from '../../../state/controlState';
+import {
+  controlState,
+  headingFromCameraSpace,
+  shortestAngleTo
+} from '../../../state/controlState';
 import { MAX_FRAME_DELTA, PLAYER_CONFIG } from '../../../utils/constants';
 import { clampToWorldBounds, createLegoMaterial } from '../../../utils/three-helpers';
+import {
+  createAnimationState,
+  poseCharacter,
+  CharacterMotion,
+  CharacterRig
+} from './characterAnimation';
 
 /**
  * The character.
  *
- * Movement takes one of two forms and they never fight:
+ * The mesh below is the placeholder Lego minifigure and is on its way out. What
+ * matters here is the movement, and all of the animation lives in
+ * ./characterAnimation so it survives the replacement untouched.
  *
- *   held input   -- keyboard or on-screen stick, interpreted relative to
- *                   wherever the camera is looking, so "forward" always means
- *                   away from you
- *   a destination -- the point you tapped; he walks there and stops
+ * Two sources of steering, resolved in this order:
  *
- * Held input wins and clears the destination, because reaching for the controls
- * means you have changed your mind.
+ *   moveAxis        keyboard or on-screen stick, camera-relative, so forward
+ *                   keeps meaning "away from you" as the camera orbits
+ *   desiredHeading  the thumb or mouse held on screen, already a world bearing
  *
- * Everything below is in units per second and scaled by the frame delta. It
- * used to be per frame, which made the character travel twice as far per second
- * on a 120 Hz phone as on a 60 Hz laptop.
+ * Held keys win, because reaching for the keyboard is a clear change of mind.
+ *
+ * He goes where he is pointed. Acceleration and braking exist for weight, not
+ * physics -- they stop a tap twitching him and let him settle out of a run --
+ * but he does not have a turning circle and the throttle is never cut for being
+ * misaligned. That was tried and it made him feel reluctant on a phone.
  */
 
-const direction = new THREE.Vector2();
 const velocity = new THREE.Vector3();
 
 const LegoPlayer: React.FC = () => {
   const playerGroupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Mesh>(null);
-  const headRef = useRef<THREE.Mesh>(null);
+  const headRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
   const rightArmRef = useRef<THREE.Group>(null);
   const leftLegRef = useRef<THREE.Group>(null);
   const rightLegRef = useRef<THREE.Group>(null);
 
+  const verticalSpeed = useRef(0);
   const canJump = useRef(true);
   const isJumping = useRef(false);
+  const animation = useRef(createAnimationState());
+  const motion = useRef<CharacterMotion>({
+    speed: 0,
+    maxSpeed: PLAYER_CONFIG.SPEED,
+    turnRate: 0,
+    airborne: false,
+    verticalSpeed: 0
+  });
   const { updateAnimation } = useLegoPlayer();
 
   useFrame((state, rawDelta) => {
@@ -46,128 +67,90 @@ const LegoPlayer: React.FC = () => {
 
     const delta = Math.min(rawDelta, MAX_FRAME_DELTA);
     const position = controlState.playerPosition;
-    direction.set(0, 0);
+
+    // 1. What are the controls asking for?
+    let requestedHeading: number | null = null;
+    let requestedThrottle = 0;
 
     const axis = controlState.moveAxis;
     if (axis.lengthSq() > 0.0001) {
-      // Camera-relative. The camera orbits to (sin yaw, cos yaw) from the
-      // player, so walking away from it is the negative of that, and right is
-      // the cross product of forward and up.
-      const yaw = controlState.cameraYaw;
-      const forwardX = -Math.sin(yaw);
-      const forwardZ = -Math.cos(yaw);
-      const rightX = Math.cos(yaw);
-      const rightZ = -Math.sin(yaw);
-      direction.set(
-        forwardX * axis.y + rightX * axis.x,
-        forwardZ * axis.y + rightZ * axis.x
+      requestedHeading = headingFromCameraSpace(axis.x, axis.y, controlState.cameraYaw);
+      requestedThrottle = Math.min(axis.length(), 1);
+    } else if (controlState.desiredHeading !== null) {
+      requestedHeading = controlState.desiredHeading;
+      requestedThrottle = controlState.throttle;
+    }
+
+    // 2. Turn, and open or close the throttle.
+    let turnedBy = 0;
+    if (requestedHeading !== null && requestedThrottle > 0) {
+      const offBy = shortestAngleTo(controlState.heading, requestedHeading);
+      const maxTurn = PLAYER_CONFIG.TURN_RATE * delta;
+      turnedBy = THREE.MathUtils.clamp(offBy, -maxTurn, maxTurn);
+      controlState.heading += turnedBy;
+
+      controlState.speed = Math.min(
+        controlState.speed + PLAYER_CONFIG.ACCELERATION * delta,
+        PLAYER_CONFIG.SPEED * requestedThrottle
       );
-    } else if (controlState.moveTarget) {
-      const dx = controlState.moveTarget.x - position.x;
-      const dz = controlState.moveTarget.z - position.z;
-      const remaining = Math.hypot(dx, dz);
-      if (remaining < PLAYER_CONFIG.ARRIVE_DISTANCE) {
-        controlState.moveTarget = null;
-      } else {
-        direction.set(dx / remaining, dz / remaining);
-      }
-    }
-
-    if (direction.lengthSq() > 0.0001) {
-      if (direction.lengthSq() > 1) direction.normalize();
-      velocity.x = direction.x * PLAYER_CONFIG.SPEED;
-      velocity.z = direction.y * PLAYER_CONFIG.SPEED;
     } else {
-      const damping = Math.pow(PLAYER_CONFIG.DAMPING_PER_SECOND, delta);
-      velocity.x *= damping;
-      velocity.z *= damping;
-      if (Math.abs(velocity.x) < 0.01) velocity.x = 0;
-      if (Math.abs(velocity.z) < 0.01) velocity.z = 0;
+      controlState.speed = Math.max(0, controlState.speed - PLAYER_CONFIG.BRAKING * delta);
     }
 
+    velocity.set(
+      Math.sin(controlState.heading) * controlState.speed,
+      0,
+      Math.cos(controlState.heading) * controlState.speed
+    );
+
+    // 3. Jump and gravity.
     if (controlState.jumpQueued) {
       controlState.jumpQueued = false;
       if (canJump.current) {
-        velocity.y = PLAYER_CONFIG.JUMP_SPEED;
+        verticalSpeed.current = PLAYER_CONFIG.JUMP_SPEED;
         canJump.current = false;
         isJumping.current = true;
       }
     }
+    verticalSpeed.current -= PLAYER_CONFIG.GRAVITY * delta;
 
-    velocity.y -= PLAYER_CONFIG.GRAVITY * delta;
     position.addScaledVector(velocity, delta);
+    position.y += verticalSpeed.current * delta;
 
     if (position.y <= PLAYER_CONFIG.HEIGHT) {
       position.y = PLAYER_CONFIG.HEIGHT;
-      velocity.y = 0;
+      verticalSpeed.current = 0;
       canJump.current = true;
       isJumping.current = false;
     }
 
     position.copy(clampToWorldBounds(position));
     group.position.copy(position);
+    group.rotation.y = controlState.heading;
 
-    const isMoving = Math.abs(velocity.x) > 0.05 || Math.abs(velocity.z) > 0.05;
-    if (isMoving) {
-      const targetFacing = Math.atan2(velocity.x, velocity.z);
-      let difference = targetFacing - controlState.playerFacing;
-      // Take the short way round rather than spinning 350 degrees.
-      while (difference > Math.PI) difference -= Math.PI * 2;
-      while (difference < -Math.PI) difference += Math.PI * 2;
-      controlState.playerFacing += difference * (1 - Math.pow(0.0001, delta));
-      group.rotation.y = controlState.playerFacing;
-    }
-
+    // 4. Pose him.
+    const isMoving = controlState.speed > 0.2;
     updateAnimation(isMoving, isJumping.current);
-    animateLegoCharacter(state.clock.getElapsedTime(), isMoving, isJumping.current);
-  });
 
-  const animateLegoCharacter = (time: number, isMoving: boolean, jumping: boolean) => {
-    if (!bodyRef.current || !headRef.current) return;
+    motion.current.speed = controlState.speed;
+    motion.current.turnRate = delta > 0 ? turnedBy / delta : 0;
+    motion.current.airborne = isJumping.current;
+    motion.current.verticalSpeed = verticalSpeed.current;
 
-    if (jumping) {
-      // Jumping animation
-      if (leftLegRef.current && rightLegRef.current) {
-        leftLegRef.current.rotation.x = -0.5;  // Legs tucked
-        rightLegRef.current.rotation.x = -0.5;
-      }
-      if (leftArmRef.current && rightArmRef.current) {
-        leftArmRef.current.rotation.x = -1.2;  // Arms up
-        rightArmRef.current.rotation.x = -1.2;
-      }
-    } else if (isMoving) {
-      // Walking animation
-      const walkCycle = Math.sin(time * 8);
-
-      if (leftLegRef.current && rightLegRef.current) {
-        leftLegRef.current.rotation.x = walkCycle * 0.5;
-        rightLegRef.current.rotation.x = -walkCycle * 0.5;
-      }
-      if (leftArmRef.current && rightArmRef.current) {
-        leftArmRef.current.rotation.x = -walkCycle * 0.3;
-        rightArmRef.current.rotation.x = walkCycle * 0.3;
-      }
-
-      // Body bob
-      bodyRef.current.position.y = Math.abs(Math.sin(time * 8)) * 0.05;
-    } else {
-      // Idle animation
-      if (leftLegRef.current && rightLegRef.current) {
-        leftLegRef.current.rotation.x = 0;
-        rightLegRef.current.rotation.x = 0;
-      }
-      if (leftArmRef.current && rightArmRef.current) {
-        leftArmRef.current.rotation.x = 0;
-        rightArmRef.current.rotation.x = 0;
-      }
-
-      // Breathing motion
-      bodyRef.current.position.y = Math.sin(time * 2) * 0.02;
-
-      // Subtle head turn
-      headRef.current.rotation.y = Math.sin(time * 1.5) * 0.1;
+    if (bodyRef.current && headRef.current && leftArmRef.current && rightArmRef.current &&
+        leftLegRef.current && rightLegRef.current) {
+      const rig: CharacterRig = {
+        root: group,
+        body: bodyRef.current,
+        head: headRef.current,
+        leftArm: leftArmRef.current,
+        rightArm: rightArmRef.current,
+        leftLeg: leftLegRef.current,
+        rightLeg: rightLegRef.current
+      };
+      poseCharacter(rig, motion.current, animation.current, delta, state.clock.getElapsedTime());
     }
-  };
+  });
 
   return (
     <group ref={playerGroupRef} position={[0, PLAYER_CONFIG.HEIGHT, 0]}>

@@ -30,21 +30,30 @@ export const COLORS = {
 /**
  * Player settings.
  *
- * These are **per second**, not per frame. They used to be per frame, which
- * meant a 120 Hz phone ran the character at double the speed of a 60 Hz laptop
- * and a background tab teleported him. The values below are the old per-frame
- * numbers multiplied by 60 so the feel on a 60 Hz display is unchanged.
+ * Deliberately NOT a vehicle model. An earlier version gave him a turning
+ * circle and cut the throttle when he was pointed the wrong way, which is
+ * correct for a car and wrong for a boy -- it made him feel heavy and reluctant
+ * on a phone. He turns quickly and goes where he is pointed. The small
+ * acceleration and braking figures are there for weight, not for physics: they
+ * are what stops a tap from twitching him and what lets him settle out of a
+ * run instead of freezing mid-stride.
+ *
+ * All values are per second. They used to be per frame, which meant a 120 Hz
+ * phone ran the character at double the speed of a 60 Hz laptop.
  */
 export const PLAYER_CONFIG = {
-  SPEED: 18,          // was 0.3/frame
-  JUMP_SPEED: 30,     // was 0.5/frame
-  GRAVITY: 54,        // was 0.015/frame
-  /** Fraction of horizontal speed retained per second when there is no input. */
-  DAMPING_PER_SECOND: 0.85 ** 60,
-  HEIGHT: 2.2,        // lifts the legs above the ground
-  SCALE: 1,
-  /** How close to a tapped point counts as having arrived. */
-  ARRIVE_DISTANCE: 0.6
+  /** Top speed, units per second. */
+  SPEED: 18,
+  /** Reaches top speed in about a fifth of a second. */
+  ACCELERATION: 90,
+  /** Settles from a run in about a sixth of a second. */
+  BRAKING: 110,
+  /** Radians per second the facing may turn. A half turn takes ~0.2 s. */
+  TURN_RATE: 16,
+  JUMP_SPEED: 30,
+  GRAVITY: 54,
+  HEIGHT: 2.2,
+  SCALE: 1
 };
 
 /**
@@ -79,15 +88,30 @@ export const PROXIMITY = {
   SECTION_RADIUS: 25
 };
 
-/** Pointer gesture thresholds, in CSS pixels and milliseconds. */
+/**
+ * Pointer gesture thresholds, in CSS pixels and milliseconds.
+ *
+ * Steering is measured from the player's own position on screen, not from where
+ * the finger first landed. Because the camera follows him he sits at roughly a
+ * fixed point on the display, so a thumb held still gives a constant bearing and
+ * he keeps going that way -- which is the behaviour being asked for. A floating
+ * stick anchored at the touch point cannot do this: it reads zero until you drag.
+ */
 export const GESTURE = {
+  /**
+   * No steering closer to the player than this. Without it the bearing is
+   * (finger - player) divided by nearly zero, and he spins.
+   */
+  STEER_DEAD_ZONE_PX: 34,
+  /** Distance from the player at which the throttle is fully open. */
+  STEER_FULL_THROTTLE_PX: 190,
   /** Beyond this much movement a press is a drag, not a tap. */
-  TAP_SLOP_PX: 10,
-  /** Longer than this and it is a press-and-hold, not a tap. */
-  TAP_MAX_MS: 400,
+  TAP_SLOP_PX: 12,
+  /** Longer than this and it is a hold, not a tap. */
+  TAP_MAX_MS: 260,
   /** Two taps closer together than this, and near each other, mean jump. */
   DOUBLE_TAP_MS: 320,
-  DOUBLE_TAP_SLOP_PX: 40,
+  DOUBLE_TAP_SLOP_PX: 44,
   /** Radians of camera yaw per pixel dragged. */
   DRAG_SENSITIVITY: 0.006
 };
