@@ -15,17 +15,17 @@ interface ControlsPanelProps {
 }
 
 const TOUCH_HINTS = [
-  { key: 'Tap', label: 'walk there' },
+  { key: 'Hold', label: 'go that way' },
   { key: 'Double-tap', label: 'jump' },
-  { key: 'Drag', label: 'look around' },
+  { key: 'Look pad', label: 'turn the camera' },
   { key: 'Pinch', label: 'zoom' }
 ];
 
 const POINTER_HINTS = [
   { key: 'W A S D', label: 'move' },
+  { key: 'Hold click', label: 'go that way' },
   { key: 'Space', label: 'jump' },
-  { key: 'Click', label: 'walk there' },
-  { key: 'Drag', label: 'look around' },
+  { key: 'Right-drag', label: 'look around' },
   { key: 'Scroll', label: 'zoom' }
 ];
 
@@ -52,7 +52,7 @@ const ControlsPanel: React.FC<ControlsPanelProps> = ({ isTouch }) => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 24, opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg px-4 py-3"
+            className="bg-white/90 rounded-2xl shadow-lg px-4 py-3"
             style={{ maxWidth: 'calc(100vw - 32px)' }}
           >
             <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center items-center">
@@ -73,7 +73,7 @@ const ControlsPanel: React.FC<ControlsPanelProps> = ({ isTouch }) => {
         type="button"
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         aria-expanded={open}
-        className="bg-white/90 backdrop-blur-md rounded-full shadow-md text-xs font-semibold text-gray-700 px-4 py-1.5"
+        className="bg-white/90 rounded-full shadow-md text-xs font-semibold text-gray-700 px-4 py-1.5"
         // 44px is the smallest thing a finger reliably hits.
         style={{ minHeight: '32px' }}
       >

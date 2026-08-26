@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import LoadingScreen from './components/UI/HUD/LoadingScreen';
 import SectionLabel from './components/UI/HUD/SectionLabel';
 import ControlsPanel from './components/UI/Controls/ControlsPanel';
+import LookPad from './components/UI/Controls/LookPad';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -72,6 +73,11 @@ const AppContent: React.FC = () => {
         <div className="pointer-events-auto">
           <ControlsPanel isTouch={isTouch} />
         </div>
+        {isTouch && (
+          <div className="pointer-events-auto">
+            <LookPad />
+          </div>
+        )}
       </div>
 
       {/* Covers the canvas until the artwork has actually loaded. */}

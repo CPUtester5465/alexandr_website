@@ -41,6 +41,8 @@ interface ActivePointer {
   startedAt: number;
   moved: boolean;
   isRightButton: boolean;
+  /** True once this pointer has been part of a two-finger gesture. */
+  usedForCamera: boolean;
 }
 
 const playerScreen = new THREE.Vector3();
@@ -97,7 +99,11 @@ const PointerControls: React.FC = () => {
     const findSteerPointer = (): ActivePointer | null => {
       if (pointers.size !== 1) return null;
       const only = pointers.values().next().value as ActivePointer;
-      return only.isRightButton ? null : only;
+      // A finger left over from a pinch must not become a steering input the
+      // moment its partner lifts -- that sent him bolting across the world at
+      // the end of every zoom. It needs a fresh press.
+      if (only.isRightButton || only.usedForCamera) return null;
+      return only;
     };
 
     const refreshSteer = () => {
@@ -134,13 +140,16 @@ const PointerControls: React.FC = () => {
         lastY: e.clientY,
         startedAt: performance.now(),
         moved: false,
-        isRightButton: e.pointerType === 'mouse' && e.button === 2
+        isRightButton: e.pointerType === 'mouse' && e.button === 2,
+        usedForCamera: false
       });
 
       if (pointers.size === 2) {
         const [a, b] = Array.from(pointers.values());
         pinchStartDistance = distanceBetween(a, b);
         pinchStartCameraDistance = controlState.cameraDistance;
+        a.usedForCamera = true;
+        b.usedForCamera = true;
       }
       refreshSteer();
     };
