@@ -7,6 +7,7 @@ import SectionLabel from './components/UI/HUD/SectionLabel';
 import ControlsPanel from './components/UI/Controls/ControlsPanel';
 import LookPad from './components/UI/Controls/LookPad';
 import DoorLabel from './components/UI/HUD/DoorLabel';
+import TravelFade from './components/UI/HUD/TravelFade';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -84,6 +85,9 @@ const AppContent: React.FC = () => {
 
       {/* Covers the canvas until the artwork has actually loaded. */}
       <LoadingScreen />
+
+      {/* Covers it again, briefly, when going through a door. */}
+      <TravelFade />
 
       <ContentPopup
         isOpen={popup.isOpen}

@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { meshVolume, quadCount, BLOCK } from '../../../world/voxel';
 import { setTerrain, clearTerrain } from '../../../world/terrain';
 import { controlState } from '../../../state/controlState';
 import { PLAYER_CONFIG } from '../../../utils/constants';
 import { generate, COLOURS, SIZE, EXTENT, PALETTE } from '../../../world/dimensions/poppy';
+import { travelTo } from '../../../state/worldState';
 
 /**
  * Dimension 01 — Poppy in Green Weather.
@@ -20,6 +22,45 @@ import { generate, COLOURS, SIZE, EXTENT, PALETTE } from '../../../world/dimensi
  * flat the way the design system requires, and it is the cheapest material
  * three.js has.
  */
+
+/**
+ * The way back.
+ *
+ * A doorway standing where you arrived, in the hub's own wood, so it reads as
+ * out-of-place here on purpose -- the one thing in the meadow that is not made
+ * of the painting. Walk into it and you are back in the room.
+ */
+const ReturnDoor: React.FC<{ at: THREE.Vector3 }> = ({ at }) => {
+  const armed = useRef(false);
+
+  useFrame(() => {
+    const d = Math.hypot(
+      at.x - controlState.playerPosition.x,
+      at.z - controlState.playerPosition.z
+    );
+    // Arm only once he has stepped away, or arriving would send him straight
+    // back through the door he just came out of.
+    if (d > 9) armed.current = true;
+    if (armed.current && d < 3) travelTo('hub', 0x6B4E31);
+  });
+
+  return (
+    <group position={[at.x, at.y, at.z]}>
+      <mesh position={[0, 3.2, 0]}>
+        <boxGeometry args={[5.2, 6.4, 0.9]} />
+        <meshBasicMaterial color={0x8A5A33} />
+      </mesh>
+      {/* The opening reads as the hub's own darkness, not as a hole. There is
+          no light here on purpose: this dimension is unlit and everything in it
+          is baked, so a lamp would illuminate nothing and only look like it
+          might. */}
+      <mesh position={[0, 3.0, 0.1]}>
+        <boxGeometry args={[3.6, 5.2, 1.0]} />
+        <meshBasicMaterial color={0x1A1410} />
+      </mesh>
+    </group>
+  );
+};
 
 const Dimension: React.FC = () => {
   const world = useMemo(() => generate(), []);
@@ -58,6 +99,8 @@ const Dimension: React.FC = () => {
         material={material}
         position={[-(SIZE.x / 2) * BLOCK, 0, -(SIZE.z / 2) * BLOCK]}
       />
+
+      <ReturnDoor at={new THREE.Vector3(world.spawn.x, world.spawn.y, world.spawn.z + 7)} />
 
       {/* Green weather. The fog colour is the painting's pale green, so the
           horizon dissolves into the same paint the ground is made of. */}

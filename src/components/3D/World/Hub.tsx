@@ -7,6 +7,7 @@ import { setTerrain, clearTerrain } from '../../../world/terrain';
 import { controlState } from '../../../state/controlState';
 import { PLAYER_CONFIG } from '../../../utils/constants';
 import { setNearestDoor } from '../../../state/hubState';
+import { travelTo, useWorld } from '../../../state/worldState';
 
 /**
  * The room with fourteen doors.
@@ -23,6 +24,12 @@ import { setNearestDoor } from '../../../state/hubState';
  */
 
 const DOOR_REACH = 7;
+/**
+ * Close enough to be going through it rather than past it. Tighter than the
+ * label reach on purpose -- you should be able to read a door's name from a
+ * step away without being pulled into it.
+ */
+const DOOR_CROSSING = 2.6;
 
 interface GlowProps {
   door: Door;
@@ -58,6 +65,7 @@ const DoorGlow: React.FC<GlowProps> = ({ door }) => {
 
 const Hub: React.FC = () => {
   const hub = useMemo(() => generateHub(), []);
+  const { cameFrom } = useWorld();
   const geometry = useMemo(() => meshVolume(hub.volume, hub.colours), [hub]);
   const material = useMemo(
     // Unlike a dimension, the hub takes light: the doors are the light sources
@@ -68,11 +76,26 @@ const Hub: React.FC = () => {
 
   useEffect(() => {
     setTerrain(hub.heightAt, hub.extent);
-    controlState.playerPosition.set(
-      hub.spawn.x,
-      hub.spawn.y + PLAYER_CONFIG.HEIGHT,
-      hub.spawn.z
-    );
+
+    // Come back through the door you left by, standing a few paces inside it --
+    // close enough to know where you are, far enough not to be swallowed again.
+    const origin = cameFrom ? hub.doors.find((d) => d.slug === cameFrom) : undefined;
+    if (origin) {
+      controlState.playerPosition.set(
+        origin.position.x - origin.facing.x * BLOCK * 5,
+        hub.heightAt(0, 0) + PLAYER_CONFIG.HEIGHT,
+        origin.position.z - origin.facing.z * BLOCK * 5
+      );
+      controlState.heading = Math.atan2(-origin.facing.x, -origin.facing.z);
+      controlState.cameraYaw = controlState.heading + Math.PI;
+      controlState.inputYaw = controlState.cameraYaw;
+    } else {
+      controlState.playerPosition.set(
+        hub.spawn.x,
+        hub.spawn.y + PLAYER_CONFIG.HEIGHT,
+        hub.spawn.z
+      );
+    }
     controlState.speed = 0;
     if (import.meta.env.DEV) {
       console.info(`[hub] ${quadCount(geometry).toLocaleString()} quads, ${hub.doors.length} doors`);
@@ -81,7 +104,7 @@ const Hub: React.FC = () => {
       clearTerrain();
       setNearestDoor(null);
     };
-  }, [hub, geometry]);
+  }, [hub, geometry, cameFrom]);
 
   // Which door is he standing at? Read on the frame loop, published at a rate
   // React can live with.
@@ -103,6 +126,13 @@ const Hub: React.FC = () => {
     if (slug !== lastPublished.current) {
       lastPublished.current = slug;
       setNearestDoor(nearest);
+    }
+
+    // Step into a built door and you go through it. An unbuilt one is solid --
+    // it says so on the label, and walking into it should confirm that rather
+    // than silently doing nothing somewhere else.
+    if (nearest && nearest.built && best < DOOR_CROSSING) {
+      travelTo(nearest.slug, nearest.colour, nearest.slug);
     }
   });
 

@@ -24,6 +24,7 @@ import SteeringIndicator from '../Player/SteeringIndicator';
 import { SECTIONS } from '../../../utils/constants';
 import Dimension from '../World/Dimension';
 import Hub from '../World/Hub';
+import { useWorld, setWorldImmediately } from '../../../state/worldState';
 
 /**
  * Which world to show.
@@ -32,24 +33,22 @@ import Hub from '../World/Hub';
  * old scene rather than replacing it before the hub exists. The old sections
  * are on their way out; this is a viewing arrangement, not an architecture.
  */
-type WorldMode = 'legacy' | 'poppy' | 'hub';
+/**
+ * Which world is on screen.
+ *
+ * The hash is an entry point, not the router: it seeds where you land so a link
+ * can drop someone straight into a dimension, and after that the doors decide.
+ * The old scene stays reachable at #legacy while it is still being cannibalised.
+ */
+function useWorldMode(): 'legacy' | 'hub' | string {
+  const { current } = useWorld();
 
-function readMode(): WorldMode {
-  if (typeof window === 'undefined') return 'legacy';
-  const hash = window.location.hash;
-  if (hash === '#poppy') return 'poppy';
-  if (hash === '#hub') return 'hub';
-  return 'legacy';
-}
-
-function useWorldMode(): WorldMode {
-  const [mode, setMode] = React.useState<WorldMode>(readMode);
   React.useEffect(() => {
-    const onHash = () => setMode(readMode());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
+    if (hash) setWorldImmediately(hash);
   }, []);
-  return mode;
+
+  return current;
 }
 
 const Scene3D: React.FC = () => {
@@ -67,9 +66,7 @@ const Scene3D: React.FC = () => {
     <group ref={sceneRef}>
       {mode === 'poppy' ? (
         <Dimension />
-      ) : mode === 'hub' ? (
-        <Hub />
-      ) : (
+      ) : mode === 'legacy' ? (
         <>
           {/* Environment */}
           <Ground />
@@ -83,6 +80,8 @@ const Scene3D: React.FC = () => {
           <AboutSection position={[SECTIONS.ABOUT.x, 0, SECTIONS.ABOUT.z]} />
           <ContactSection position={[SECTIONS.CONTACT.x, 0, SECTIONS.CONTACT.z]} />
         </>
+      ) : (
+        <Hub />
       )}
 
       {/* Player Character */}
