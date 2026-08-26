@@ -22,9 +22,30 @@ import SteeringIndicator from '../Player/SteeringIndicator';
 
 // Import section positions
 import { SECTIONS } from '../../../utils/constants';
+import Dimension from '../World/Dimension';
+
+/**
+ * Which world to show.
+ *
+ * Dimension 01 lives behind #poppy for now so it can be compared against the
+ * old scene rather than replacing it before the hub exists. The old sections
+ * are on their way out; this is a viewing arrangement, not an architecture.
+ */
+function useWorldMode(): 'legacy' | 'poppy' {
+  const [mode, setMode] = React.useState<'legacy' | 'poppy'>(
+    () => (typeof window !== 'undefined' && window.location.hash === '#poppy' ? 'poppy' : 'legacy')
+  );
+  React.useEffect(() => {
+    const onHash = () => setMode(window.location.hash === '#poppy' ? 'poppy' : 'legacy');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  return mode;
+}
 
 const Scene3D: React.FC = () => {
   const sceneRef = useRef<THREE.Group>(null);
+  const mode = useWorldMode();
 
   useFrame(({ clock }) => {
     // Global scene animations can go here
@@ -35,17 +56,23 @@ const Scene3D: React.FC = () => {
 
   return (
     <group ref={sceneRef}>
-      {/* Environment */}
-      <Ground />
-      <Skybox />
-      <FloatingIslands count={8} />
-      
-      {/* Interactive Sections */}
-      <WelcomeArea position={[SECTIONS.WELCOME.x, 0, SECTIONS.WELCOME.z]} />
-      <AchievementsSection position={[SECTIONS.ACHIEVEMENTS.x, 0, SECTIONS.ACHIEVEMENTS.z]} />
-      <ArtGallery position={[SECTIONS.ART_GALLERY.x, 0, SECTIONS.ART_GALLERY.z]} />
-      <AboutSection position={[SECTIONS.ABOUT.x, 0, SECTIONS.ABOUT.z]} />
-      <ContactSection position={[SECTIONS.CONTACT.x, 0, SECTIONS.CONTACT.z]} />
+      {mode === 'poppy' ? (
+        <Dimension />
+      ) : (
+        <>
+          {/* Environment */}
+          <Ground />
+          <Skybox />
+          <FloatingIslands count={8} />
+
+          {/* Interactive Sections */}
+          <WelcomeArea position={[SECTIONS.WELCOME.x, 0, SECTIONS.WELCOME.z]} />
+          <AchievementsSection position={[SECTIONS.ACHIEVEMENTS.x, 0, SECTIONS.ACHIEVEMENTS.z]} />
+          <ArtGallery position={[SECTIONS.ART_GALLERY.x, 0, SECTIONS.ART_GALLERY.z]} />
+          <AboutSection position={[SECTIONS.ABOUT.x, 0, SECTIONS.ABOUT.z]} />
+          <ContactSection position={[SECTIONS.CONTACT.x, 0, SECTIONS.CONTACT.z]} />
+        </>
+      )}
 
       {/* Player Character */}
       <Player />

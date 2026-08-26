@@ -1,14 +1,15 @@
 import * as THREE from 'three';
-import { WORLD_BOUNDS } from './constants';
+import { getBounds } from '../world/terrain';
 
 /**
  * Clamp position within world boundaries
  */
 export const clampToWorldBounds = (position: THREE.Vector3): THREE.Vector3 => {
+  const bounds = getBounds();
   return new THREE.Vector3(
-    Math.max(WORLD_BOUNDS.MIN_X, Math.min(WORLD_BOUNDS.MAX_X, position.x)),
+    Math.max(bounds.minX, Math.min(bounds.maxX, position.x)),
     position.y,
-    Math.max(WORLD_BOUNDS.MIN_Z, Math.min(WORLD_BOUNDS.MAX_Z, position.z))
+    Math.max(bounds.minZ, Math.min(bounds.maxZ, position.z))
   );
 };
 

@@ -63,7 +63,7 @@ const SteeringIndicator: React.FC = () => {
   });
 
   return (
-    <group ref={groupRef} visible={false}>
+    <group ref={groupRef} visible={false} userData={{ cameraTransparent: true }}>
       {/* Footprint ring, flat on the ground. */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.82, 1.0, 48]} />

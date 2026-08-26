@@ -30,8 +30,24 @@ export { globalPlayerPosition } from '../../../state/controlState';
 const POSITION_SMOOTH = 0.0009;
 const AIM_SMOOTH = 0.0001;
 
+/**
+ * Does this object, or anything it hangs from, opt out of blocking the camera?
+ *
+ * Walking the parent chain matters: the character is a group of seven meshes
+ * and the flag lives on the group. Testing only the hit object let the spring
+ * arm hit his own back, pull the camera to the minimum, miss on the next frame
+ * and release -- which reads as the camera pulsing in and out as he moves.
+ */
+function isCameraTransparent(object: THREE.Object3D | null): boolean {
+  for (let node = object; node; node = node.parent) {
+    if (node.userData?.cameraTransparent === true) return true;
+  }
+  return false;
+}
+
 const desired = new THREE.Vector3();
 const aim = new THREE.Vector3();
+const origin = new THREE.Vector3();
 const smoothedAim = new THREE.Vector3();
 const toCamera = new THREE.Vector3();
 
@@ -81,17 +97,21 @@ const CameraController: React.FC = () => {
     // --- 1. spring arm ------------------------------------------------------
     // Cast from the player outward. Anything in the way pulls the camera in to
     // just short of it rather than letting it pass through.
-    toCamera.copy(desired).sub(playerPosition);
+    // Cast from his head, not his hip. The hip sits level with the ground he is
+    // standing on, so a low camera angle grazes the terrain he is stood on and
+    // yanks itself in.
+    origin.copy(playerPosition).add(CAMERA_CONFIG.LOOK_AT_OFFSET);
+    toCamera.copy(desired).sub(origin);
     const reach = toCamera.length();
     if (reach > 0.001) {
       toCamera.divideScalar(reach);
-      raycaster.set(playerPosition, toCamera);
+      raycaster.set(origin, toCamera);
       raycaster.far = reach;
       const blockers = raycaster.intersectObjects(scene.children, true)
-        .filter((hit) => hit.object.userData?.cameraTransparent !== true && hit.distance > 0.05);
+        .filter((hit) => !isCameraTransparent(hit.object) && hit.distance > 0.05);
       if (blockers.length > 0) {
         const clear = Math.max(1.2, blockers[0].distance - CAMERA_CONFIG.COLLISION_MARGIN);
-        desired.copy(playerPosition).addScaledVector(toCamera, clear);
+        desired.copy(origin).addScaledVector(toCamera, clear);
       }
     }
 

@@ -9,6 +9,7 @@ import {
 } from '../../../state/controlState';
 import { MAX_FRAME_DELTA, PLAYER_CONFIG } from '../../../utils/constants';
 import { clampToWorldBounds } from '../../../utils/three-helpers';
+import { groundHeightAt } from '../../../world/terrain';
 import BlockCharacter from './BlockCharacter';
 import {
   createAnimationState,
@@ -118,8 +119,11 @@ const Player: React.FC = () => {
     position.addScaledVector(velocity, delta);
     position.y += verticalSpeed.current * delta;
 
-    if (position.y <= PLAYER_CONFIG.HEIGHT) {
-      position.y = PLAYER_CONFIG.HEIGHT;
+    // The floor is wherever the world says it is. It used to be the constant
+    // zero, which put him waist-deep in the first hill a dimension grew.
+    const floor = groundHeightAt(position.x, position.z) + PLAYER_CONFIG.HEIGHT;
+    if (position.y <= floor) {
+      position.y = floor;
       verticalSpeed.current = 0;
       canJump.current = true;
       isJumping.current = false;
@@ -154,7 +158,11 @@ const Player: React.FC = () => {
   });
 
   return (
-    <group ref={playerGroupRef} position={[0, PLAYER_CONFIG.HEIGHT, 0]}>
+    <group
+      ref={playerGroupRef}
+      position={[0, PLAYER_CONFIG.HEIGHT, 0]}
+      userData={{ cameraTransparent: true }}
+    >
       <BlockCharacter
         bodyRef={bodyRef}
         headRef={headRef}
