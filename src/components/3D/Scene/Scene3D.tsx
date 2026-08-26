@@ -68,7 +68,11 @@ const Scene3D: React.FC = () => {
       {mode !== 'hub' && mode !== 'legacy' ? (
         // The smooth painterly study replaces the poppy dimension's view on
         // this branch; the other seventeen still render the voxel path.
-        mode === 'poppy' ? <SmoothDimension slug={mode} /> : <Dimension slug={mode} />
+        // The smooth painterly path serves the worlds whose skies have been
+        // through the fidelity court; the rest stay voxel until their turn.
+        ['poppy', 'pagoda'].includes(mode)
+          ? <SmoothDimension slug={mode} />
+          : <Dimension slug={mode} />
       ) : mode === 'legacy' ? (
         <>
           {/* Environment */}

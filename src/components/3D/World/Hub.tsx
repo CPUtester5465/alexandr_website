@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { useTexture } from '@react-three/drei';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { meshVolume, quadCount, BLOCK } from '../../../world/voxel';
@@ -10,6 +11,9 @@ import { PLAYER_CONFIG } from '../../../utils/constants';
 import { setNearestDoor } from '../../../state/hubState';
 import { travelTo, useWorld } from '../../../state/worldState';
 import { useLocale, pick } from '../../../state/locale';
+import PostFX from '../PostFX';
+import { BLOOM_LAYER } from '../PostFX';
+import { dimensionBySlug } from '../../../world/dimensions/registry';
 
 /**
  * The room with fourteen doors.
@@ -26,6 +30,12 @@ import { useLocale, pick } from '../../../state/locale';
  */
 
 const DOOR_REACH = 7;
+
+/**
+ * The hub's grade palette, in the same slot convention as the dimensions:
+ * [1] is read for shadows (dark oak), [5] for highlights (his paper).
+ */
+const HUB_PALETTE = ['#6B4E31', '#4A3524', '#8A5A33', '#5C4229', '#C8B392', '#EDE6D2'];
 /**
  * Close enough to be going through it rather than past it. Tighter than the
  * label reach on purpose -- you should be able to read a door's name from a
@@ -74,6 +84,81 @@ const DoorSign: React.FC<GlowProps> = ({ door }) => {
   );
 };
 
+/**
+ * The painting itself, hung over its door.
+ *
+ * The room is his study, and the honest answer to "what is behind this door"
+ * is the painting the world was grown from. 384px webp thumbs, ~20KB each --
+ * the whole gallery weighs 299KB. Subject doors hang nothing; their record
+ * hangs on the label instead.
+ */
+const HungPainting: React.FC<GlowProps> = ({ door }) => {
+  const entry = dimensionBySlug(door.slug);
+  const texture = useTexture(`/art-thumbs/${entry?.painting}.webp`);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  // Sized to sit clear of the arch below and the curved wall behind: the ring
+  // wall bends, so anything wide enough pokes through it at the corners --
+  // which is exactly what the first pass did.
+  const w = 3.2;
+  const image = texture.image as { width: number; height: number } | undefined;
+  const h = Math.min(image ? (w * image.height) / image.width : w, 4.4);
+  const inward = door.facing.clone().multiplyScalar(-1);
+
+  return (
+    <group
+      position={[
+        // door.position sits ~2 blocks deep in the alcove, so anything less
+        // than that much inward hangs INSIDE the wall -- which is where the
+        // whole gallery vanished to on the second pass.
+        door.position.x + inward.x * BLOCK * 2.45,
+        BLOCK * 7.1,
+        door.position.z + inward.z * BLOCK * 2.45
+      ]}
+      rotation={[0, Math.atan2(inward.x, inward.z), 0]}
+    >
+      {/* frame, in the study's wood */}
+      <mesh position={[0, 0, -0.06]}>
+        <boxGeometry args={[w + 0.5, h + 0.5, 0.12]} />
+        <meshLambertMaterial color={0x8A5A33} />
+      </mesh>
+      <mesh>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+};
+
+/**
+ * A slim emissive panel in the doorway on the bloom layer, so the door's
+ * sampled colour carries as a glow once the post stack runs -- point lights
+ * alone cannot bloom because bloom selects meshes.
+ */
+const DoorBloomPanel: React.FC<GlowProps> = ({ door }) => {
+  const inward = door.facing.clone().multiplyScalar(-1);
+  return (
+    <mesh
+      position={[
+        door.position.x - inward.x * BLOCK * 1.2,
+        BLOCK * 3.2,
+        door.position.z - inward.z * BLOCK * 1.2
+      ]}
+      rotation={[0, Math.atan2(inward.x, inward.z), 0]}
+      layers-mask={(1 << 0) | (1 << BLOOM_LAYER)}
+    >
+      <planeGeometry args={[3.6, 4.9]} />
+      <meshBasicMaterial
+        color={door.colour}
+        transparent
+        opacity={0.26}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+};
+
 const DoorGlow: React.FC<GlowProps> = ({ door }) => {
   const light = useRef<THREE.PointLight>(null);
 
@@ -105,6 +190,21 @@ const DoorGlow: React.FC<GlowProps> = ({ door }) => {
 const Hub: React.FC = () => {
   const hub = useMemo(() => generateHub(), []);
   const { cameFrom } = useWorld();
+  const { scene } = useThree();
+
+  // Same bug the study found in the dimensions: <color attach>/<fog attach>
+  // inside a group never reach the scene. The hub has ALSO been running under
+  // the app's sky-blue fog since it was built. Imperative, like everywhere now.
+  useEffect(() => {
+    const previousFog = scene.fog;
+    const previousBackground = scene.background;
+    scene.fog = new THREE.Fog(0x1A1410, 30, 130);
+    scene.background = new THREE.Color(0x1A1410);
+    return () => {
+      scene.fog = previousFog;
+      scene.background = previousBackground;
+    };
+  }, [scene]);
   const geometry = useMemo(() => meshVolume(hub.volume, hub.colours), [hub]);
   const material = useMemo(
     // Unlike a dimension, the hub takes light: the doors are the light sources
@@ -188,15 +288,19 @@ const Hub: React.FC = () => {
       {hub.doors.map((door) => (
         <React.Fragment key={door.slug}>
           <DoorGlow door={door} />
+          <DoorBloomPanel door={door} />
           <DoorSign door={door} />
+          {door.kind === 'painting' && <HungPainting door={door} />}
         </React.Fragment>
       ))}
+
+      {/* The same post stack the worlds run: bloom for the door glows, the
+          grade pulled toward wood and paper instead of a painting. */}
+      <PostFX palette={HUB_PALETTE} />
 
       {/* Enough ambient that the room is never black, and no more -- the doors
           are supposed to be doing the lighting. */}
       <ambientLight intensity={0.34} color="#C8B392" />
-      <color attach="background" args={[0x1A1410]} />
-      <fog attach="fog" args={[0x1A1410, 30, 130]} />
     </group>
   );
 };

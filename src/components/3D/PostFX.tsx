@@ -6,7 +6,7 @@ import {
   SelectiveBloomEffect, VignetteEffect, Effect, BlendFunction,
   ToneMappingEffect, ToneMappingMode
 } from 'postprocessing';
-import { DimensionSpec } from '../../world/dimensions/specs';
+
 
 /**
  * The painterly post stack, mounted only while a smooth dimension is on
@@ -60,7 +60,11 @@ class PaletteGradeEffect extends Effect {
   }
 }
 
-const PostFX: React.FC<{ spec: DimensionSpec }> = ({ spec }) => {
+/**
+ * palette: sampled hexes, most-used first; the grade reads [1] for shadows and
+ * [5] for highlights, the same slots every recipe fills.
+ */
+const PostFX: React.FC<{ palette: string[] }> = ({ palette }) => {
   const { gl, scene, camera, size } = useThree();
   const composerRef = useRef<EffectComposer | null>(null);
   const sizeRef = useRef(size);
@@ -98,8 +102,8 @@ const PostFX: React.FC<{ spec: DimensionSpec }> = ({ spec }) => {
 
     // Shadows toward the deep green, highlights toward the warm tan -- the
     // grade is fed from the painting's own palette.
-    const shadow = new THREE.Color(spec.palette[1] ?? spec.palette[0] ?? '#444444');
-    const high = new THREE.Color(spec.palette[5] ?? spec.palette[0] ?? '#cccccc');
+    const shadow = new THREE.Color(palette[1] ?? palette[0] ?? '#444444');
+    const high = new THREE.Color(palette[5] ?? palette[0] ?? '#cccccc');
     // Rendering through the composer bypasses the renderer's own ACES pass
     // (three only tone maps the default framebuffer), so without this the
     // whole world comes back linear: bright, milky and flat.
@@ -120,7 +124,7 @@ const PostFX: React.FC<{ spec: DimensionSpec }> = ({ spec }) => {
       }
       composer.dispose();
     };
-  }, [gl, scene, camera, spec, reducedMotion]);
+  }, [gl, scene, camera, palette, reducedMotion]);
 
   useEffect(() => {
     sizeRef.current = size;

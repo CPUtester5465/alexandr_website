@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import SmoothChunkedWorld from './SmoothChunkedWorld';
 import Grass from './Grass';
 import Poppies from './Poppies';
+import Pagodas from './Pagodas';
+import PagodaFlora from './PagodaFlora';
 import SkyDome from './SkyDome';
 import PostFX from '../PostFX';
 import { ReturnDoor } from './Dimension';
@@ -32,10 +34,10 @@ import { setActiveDimension } from '../../../state/dimensionState';
 const ARRIVAL_HEADING = Math.PI;
 const DOOR_BEHIND = 11;
 
-/** Fog tuned to the 5x5 chunk window: the far edge dissolves before the last
- *  loaded chunk does, and the dome takes over from there. */
-const FOG_NEAR = 34;
-const FOG_FAR = 145;
+/** Fog capped to the 5x5 chunk window: the far edge must dissolve before the
+ *  last loaded chunk does, and the dome takes over from there. Near comes from
+ *  the spec, so pagoda's mist sits closer than poppy's drizzle. */
+const FOG_FAR_CAP = 145;
 
 const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
   const spec = useMemo(() => specBySlug(slug), [slug]);
@@ -68,14 +70,18 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
     return { spawn, door: back };
   }, [field]);
 
-  // Fog and hemisphere tints, interpolated inside the palette (Law 2).
+  // Fog and hemisphere tints from the spec's ROLES, not fixed palette indices
+  // -- fixed indices were poppy's private assumption and pagoda's palette is
+  // ordered differently. sky is already the sampled sky colour; pale and deep
+  // are whatever the recipe assigned them.
   const atmosphere = useMemo(() => {
     if (!spec) return null;
-    const hex = (i: number) => new THREE.Color(spec.palette[i] ?? '#888888');
+    const role = (id: number, fallback: string) =>
+      (spec.colours[id] ?? new THREE.Color(fallback)).clone();
     return {
-      fog: hex(4).lerp(hex(5), 0.4).multiplyScalar(1.15),
-      hemiSky: hex(4).multiplyScalar(1.1),
-      hemiGround: hex(1)
+      fog: new THREE.Color(spec.sky).multiplyScalar(1.05),
+      hemiSky: role(spec.blocks.pale, '#888888').multiplyScalar(1.1),
+      hemiGround: role(spec.blocks.deep, '#444444')
     };
   }, [spec]);
 
@@ -88,7 +94,8 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
     const oldFog = scene.fog;
     const oldBackground = scene.background;
     const noFog = import.meta.env.DEV && window.location.search.includes('nofog');
-    scene.fog = noFog ? null : new THREE.Fog(atmosphere.fog, FOG_NEAR, FOG_FAR);
+    scene.fog = noFog ? null : new THREE.Fog(
+      atmosphere.fog, spec!.fog.near, Math.min(spec!.fog.far, FOG_FAR_CAP));
     scene.background = atmosphere.fog.clone();
     return () => {
       scene.fog = oldFog;
@@ -127,8 +134,16 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
   return (
     <group>
       <SmoothChunkedWorld spec={spec} field={field} />
-      <Grass spec={spec} field={field} />
-      <Poppies spec={spec} field={field} />
+      {/* The dressing follows the structure kind: meadows get grass and
+          flowers, the mist valley gets towers and bare ground. */}
+      {spec.structure.kind === 'flower' && <Grass spec={spec} field={field} />}
+      {spec.structure.kind === 'flower' && <Poppies spec={spec} field={field} />}
+      {spec.structure.kind === 'pillar' && (
+        <>
+          <Pagodas spec={spec} field={field} />
+          <PagodaFlora spec={spec} field={field} />
+        </>
+      )}
       <SkyDome spec={spec} />
       <ReturnDoor at={arrival.door} slug={slug} />
       {/* The one extra light this study allows: a hemisphere between the pale
@@ -138,7 +153,7 @@ const SmoothDimension: React.FC<{ slug: string }> = ({ slug }) => {
         args={[atmosphere.hemiSky, atmosphere.hemiGround, 0.5]}
       />
       {!(import.meta.env.DEV && window.location.search.includes('nopost')) && (
-        <PostFX spec={spec} />
+        <PostFX palette={spec.palette} />
       )}
     </group>
   );
