@@ -21,3 +21,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Marble splat downloads -- can be hundreds of MB; curated files move to public/marble/ by hand
+marble-assets/
