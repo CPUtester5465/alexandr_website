@@ -72,22 +72,33 @@ export const CAMERA_CONFIG = {
   OFFSET: new THREE.Vector3(0, 8, 12),
   LOOK_AT_OFFSET: new THREE.Vector3(0, 1.4, 0),
   LERP_SPEED: 0.1,
-  /** Orbit distance from the player, and the range a pinch may set. */
-  DISTANCE: 14.4,
-  MIN_DISTANCE: 6,
-  MAX_DISTANCE: 30,
+  /**
+   * Orbit distance, and the range a pinch may set.
+   *
+   * Pulled back from 14.4. The further out the camera sits, the smaller the
+   * angular swing for a given amount of movement -- most of what read as
+   * "wiggle" was parallax from being close, not the camera actually moving.
+   */
+  DISTANCE: 22,
+  MIN_DISTANCE: 9,
+  MAX_DISTANCE: 40,
   /** Pitch is clamped so the camera never dives below the ground plane. */
   MIN_PITCH: 0.12,
   MAX_PITCH: 1.15,
-  INITIAL_PITCH: 0.58,
+  INITIAL_PITCH: 0.64,
 
   /**
    * Auto-follow. The camera swings behind the direction of travel on its own;
    * touching it by hand suspends that for MANUAL_AUTHORITY_S.
    */
-  FOLLOW_DEAD_ZONE: 0.28,      // radians of slack before it starts to swing
-  FOLLOW_RATE: 2.4,            // how hard it pulls, per second
+  FOLLOW_DEAD_ZONE: 0.30,      // radians of slack before it recentres at all
+  FOLLOW_RATE: 1.6,            // how hard it pulls, per second, once it does
   MANUAL_AUTHORITY_S: 2.5,
+  /**
+   * Wait this long after the controls are released before recentring, so a
+   * momentary lift between strides does not start the camera swinging.
+   */
+  RECENTRE_DELAY_S: 0.45,
   /** Look-ahead: how far in front of him the camera aims, at full speed. */
   LOOK_AHEAD: 3.2,
   /** Keep this much clear between the camera and whatever it hit. */
