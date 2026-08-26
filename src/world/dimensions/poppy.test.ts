@@ -46,6 +46,37 @@ describe('dimension 01 — generation', () => {
     expect(pollen).toBeGreaterThan(20);
   });
 
+  it('puts the way home behind him, not in front', () => {
+    // The loop this exists for: he used to arrive facing the return doorway, so
+    // walking forward -- the first thing anyone does -- sent him straight back
+    // to the hub. A world you cannot walk into is not a world.
+    const { spawn, arrivalHeading, returnDoor } = generate(SEED);
+    const forwardX = Math.sin(arrivalHeading);
+    const forwardZ = Math.cos(arrivalHeading);
+    const toDoorX = returnDoor.x - spawn.x;
+    const toDoorZ = returnDoor.z - spawn.z;
+    const alignment =
+      (forwardX * toDoorX + forwardZ * toDoorZ) / Math.hypot(toDoorX, toDoorZ);
+    expect(alignment).toBeLessThan(-0.9);   // squarely behind him
+  });
+
+  it('starts him closer to the doorway than its arming distance', () => {
+    // The return door only opens once he has walked 16 units clear of it. If he
+    // started further away than that it would be live on arrival and the loop
+    // would come straight back.
+    const { spawn, returnDoor } = generate(SEED);
+    const ARMING_DISTANCE = 16;
+    const gap = Math.hypot(returnDoor.x - spawn.x, returnDoor.z - spawn.z);
+    expect(gap).toBeLessThan(ARMING_DISTANCE);
+    expect(gap).toBeGreaterThan(6);          // and not on top of him either
+  });
+
+  it('spawns him well inside the meadow, not out on the thin edge', () => {
+    const { spawn, heightAt } = generate(SEED);
+    expect(heightAt(spawn.x, spawn.z)).toBeGreaterThan(0);
+    expect(Math.abs(spawn.z)).toBeLessThan((SIZE.z / 2) * BLOCK * 0.75);
+  });
+
   it('spawns him standing on the surface, not inside it', () => {
     const { spawn, heightAt } = generate(SEED);
     expect(spawn.y).toBeCloseTo(heightAt(spawn.x, spawn.z));

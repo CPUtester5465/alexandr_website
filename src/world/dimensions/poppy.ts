@@ -59,6 +59,17 @@ export interface GeneratedDimension {
   heightAt(x: number, z: number): number;
   /** Where to put him, in world units. */
   spawn: THREE.Vector3;
+  /**
+   * Which way he is looking when he arrives, radians.
+   *
+   * Into the world, never at the way back. He has just come through that door;
+   * it belongs behind him, the way it would if he had really walked through it.
+   * Facing him at it made walking forward return him to the hub, which is a
+   * loop rather than a world.
+   */
+  arrivalHeading: number;
+  /** The doorway home, placed behind his shoulder. */
+  returnDoor: THREE.Vector3;
 }
 
 /**
@@ -126,11 +137,24 @@ export function generate(seed: number = SEED): GeneratedDimension {
     return heights[x + z * SIZE.x] * BLOCK;
   };
 
-  const spawnHeight = heights[Math.floor(SIZE.x / 2) + Math.floor(SIZE.z / 2) * SIZE.x];
+  // He arrives off-centre and looks across the meadow, so the first thing in
+  // frame is the world rather than the edge of it.
+  const arrivalHeading = Math.PI;             // toward -Z, into the field
+  const spawnX = 0;
+  const spawnZ = 14 * BLOCK;
+  const spawn = new THREE.Vector3(spawnX, heightAt(spawnX, spawnZ), spawnZ);
+
+  // Directly behind him: sin/cos of the heading is forward, so its negative is
+  // over his shoulder.
+  const backX = spawnX - Math.sin(arrivalHeading) * 11;
+  const backZ = spawnZ - Math.cos(arrivalHeading) * 11;
+
   return {
     volume,
     heightAt,
-    spawn: new THREE.Vector3(0, spawnHeight * BLOCK, 0)
+    spawn,
+    arrivalHeading,
+    returnDoor: new THREE.Vector3(backX, heightAt(backX, backZ), backZ)
   };
 }
 

@@ -30,7 +30,7 @@ import { travelTo } from '../../../state/worldState';
  * out-of-place here on purpose -- the one thing in the meadow that is not made
  * of the painting. Walk into it and you are back in the room.
  */
-const ReturnDoor: React.FC<{ at: THREE.Vector3 }> = ({ at }) => {
+const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string; facing: number }> = ({ at, slug, facing }) => {
   const armed = useRef(false);
 
   useFrame(() => {
@@ -38,14 +38,14 @@ const ReturnDoor: React.FC<{ at: THREE.Vector3 }> = ({ at }) => {
       at.x - controlState.playerPosition.x,
       at.z - controlState.playerPosition.z
     );
-    // Arm only once he has stepped away, or arriving would send him straight
-    // back through the door he just came out of.
-    if (d > 9) armed.current = true;
-    if (armed.current && d < 3) travelTo('hub', 0x6B4E31);
+    // Arm only once he has walked properly away. He starts eleven units from it
+    // with his back turned, so this cannot fire on arrival.
+    if (d > 16) armed.current = true;
+    if (armed.current && d < 3.4) travelTo('hub', 0x6B4E31, slug);
   });
 
   return (
-    <group position={[at.x, at.y, at.z]}>
+    <group position={[at.x, at.y, at.z]} rotation={[0, facing, 0]}>
       <mesh position={[0, 3.2, 0]}>
         <boxGeometry args={[5.2, 6.4, 0.9]} />
         <meshBasicMaterial color={0x8A5A33} />
@@ -74,7 +74,13 @@ const Dimension: React.FC = () => {
       world.spawn.y + PLAYER_CONFIG.HEIGHT,
       world.spawn.z
     );
+    // Face him into the world with the way home behind him, and set the camera
+    // over his shoulder so the doorway stays visible without being in the way.
+    controlState.heading = world.arrivalHeading;
+    controlState.cameraYaw = world.arrivalHeading + Math.PI;
+    controlState.inputYaw = controlState.cameraYaw;
     controlState.speed = 0;
+    controlState.manualCameraFor = 0;
 
     if (import.meta.env.DEV) {
       const quads = quadCount(geometry);
@@ -100,7 +106,7 @@ const Dimension: React.FC = () => {
         position={[-(SIZE.x / 2) * BLOCK, 0, -(SIZE.z / 2) * BLOCK]}
       />
 
-      <ReturnDoor at={new THREE.Vector3(world.spawn.x, world.spawn.y, world.spawn.z + 7)} />
+      <ReturnDoor at={world.returnDoor} slug="poppy" facing={world.arrivalHeading} />
 
       {/* Green weather. The fog colour is the painting's pale green, so the
           horizon dissolves into the same paint the ground is made of. */}
