@@ -55,7 +55,7 @@ const SteeringIndicator: React.FC = () => {
     if (arrowRef.current) {
       arrowRef.current.visible = drive > 0.02;
       // Reaches further the harder you push.
-      arrowRef.current.position.z = 2.1 + drive * 1.9;
+      arrowRef.current.position.z = 1.5 + drive * 1.6;
       const scale = 0.55 + drive * 0.65;
       arrowRef.current.scale.setScalar(scale);
     }
@@ -66,7 +66,7 @@ const SteeringIndicator: React.FC = () => {
     <group ref={groupRef} visible={false}>
       {/* Footprint ring, flat on the ground. */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.35, 1.62, 48]} />
+        <ringGeometry args={[0.82, 1.0, 48]} />
         <meshBasicMaterial
           ref={ringMaterial}
           color="#FFFFFF"
@@ -80,7 +80,7 @@ const SteeringIndicator: React.FC = () => {
       {/* Heading arrow. +Z is forward, matching how heading is built. */}
       <group ref={arrowRef}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[0.62, 1.25, 3]} />
+          <coneGeometry args={[0.42, 0.95, 3]} />
           <meshBasicMaterial
             ref={arrowMaterial}
             color="#FFFFFF"

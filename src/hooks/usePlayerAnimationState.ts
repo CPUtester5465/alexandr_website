@@ -2,12 +2,12 @@ import { useState, useCallback } from 'react';
 
 type AnimationState = 'idle' | 'walking' | 'jumping';
 
-interface UseLegoPlayerReturn {
+interface PlayerAnimationState {
   animationState: AnimationState;
   updateAnimation: (isMoving: boolean, isJumping: boolean) => void;
 }
 
-export const useLegoPlayer = (): UseLegoPlayerReturn => {
+export const usePlayerAnimationState = (): PlayerAnimationState => {
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
 
   const updateAnimation = useCallback((isMoving: boolean, isJumping: boolean) => {

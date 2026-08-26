@@ -1,14 +1,15 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useLegoPlayer } from '../../../hooks/useLegoPlayer';
+import { usePlayerAnimationState } from '../../../hooks/usePlayerAnimationState';
 import {
   controlState,
   headingFromCameraSpace,
   shortestAngleTo
 } from '../../../state/controlState';
 import { MAX_FRAME_DELTA, PLAYER_CONFIG } from '../../../utils/constants';
-import { clampToWorldBounds, createLegoMaterial } from '../../../utils/three-helpers';
+import { clampToWorldBounds } from '../../../utils/three-helpers';
+import BlockCharacter from './BlockCharacter';
 import {
   createAnimationState,
   poseCharacter,
@@ -17,11 +18,11 @@ import {
 } from './characterAnimation';
 
 /**
- * The character.
+ * The character: movement and steering.
  *
- * The mesh below is the placeholder Lego minifigure and is on its way out. What
- * matters here is the movement, and all of the animation lives in
- * ./characterAnimation so it survives the replacement untouched.
+ * The body is BlockCharacter and the posing is characterAnimation. This file
+ * only decides where he goes -- that separation is what let the minifigure be
+ * swapped for Alexandr without touching a line of the animation.
  *
  * Two sources of steering, resolved in this order:
  *
@@ -39,9 +40,9 @@ import {
 
 const velocity = new THREE.Vector3();
 
-const LegoPlayer: React.FC = () => {
+const Player: React.FC = () => {
   const playerGroupRef = useRef<THREE.Group>(null);
-  const bodyRef = useRef<THREE.Mesh>(null);
+  const bodyRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
   const rightArmRef = useRef<THREE.Group>(null);
@@ -59,7 +60,7 @@ const LegoPlayer: React.FC = () => {
     airborne: false,
     verticalSpeed: 0
   });
-  const { updateAnimation } = useLegoPlayer();
+  const { updateAnimation } = usePlayerAnimationState();
 
   useFrame((state, rawDelta) => {
     const group = playerGroupRef.current;
@@ -154,101 +155,16 @@ const LegoPlayer: React.FC = () => {
 
   return (
     <group ref={playerGroupRef} position={[0, PLAYER_CONFIG.HEIGHT, 0]}>
-      {/* Body (torso) */}
-      <mesh ref={bodyRef} castShadow>
-        <boxGeometry args={[1.2, 1.8, 1.2]} />
-        <primitive object={createLegoMaterial('#FF6B6B')} />
-      </mesh>
-
-      {/* Head */}
-      <group ref={headRef} position={[0, 1.25, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.5, 0.5, 0.8, 16]} />
-          <primitive object={createLegoMaterial('#FFD93D')} />
-        </mesh>
-
-        {/* Head studs (classic Lego) */}
-        {[...Array(3)].map((_, i) => (
-          <mesh key={i} position={[
-            (i - 1) * 0.2,
-            0.45,
-            0
-          ]}>
-            <cylinderGeometry args={[0.05, 0.05, 0.1, 8]} />
-            <primitive object={createLegoMaterial('#FFD93D')} />
-          </mesh>
-        ))}
-
-        {/* Eyes */}
-        <mesh position={[-0.15, 0, 0.4]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshPhongMaterial color="#000000" />
-        </mesh>
-        <mesh position={[0.15, 0, 0.4]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshPhongMaterial color="#000000" />
-        </mesh>
-
-        {/* Mouth */}
-        <mesh position={[0, -0.15, 0.4]}>
-          <sphereGeometry args={[0.04, 8, 8]} />
-          <meshPhongMaterial color="#000000" />
-        </mesh>
-      </group>
-
-      {/* Left Arm */}
-      <group ref={leftArmRef} position={[-0.7, 0.5, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.15, 0.15, 1.2, 8]} />
-          <primitive object={createLegoMaterial('#FFD93D')} />
-        </mesh>
-        {/* Hand */}
-        <mesh position={[0, -0.8, 0]}>
-          <sphereGeometry args={[0.2, 8, 8]} />
-          <primitive object={createLegoMaterial('#FFD93D')} />
-        </mesh>
-      </group>
-
-      {/* Right Arm */}
-      <group ref={rightArmRef} position={[0.7, 0.5, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.15, 0.15, 1.2, 8]} />
-          <primitive object={createLegoMaterial('#FFD93D')} />
-        </mesh>
-        {/* Hand */}
-        <mesh position={[0, -0.8, 0]}>
-          <sphereGeometry args={[0.2, 8, 8]} />
-          <primitive object={createLegoMaterial('#FFD93D')} />
-        </mesh>
-      </group>
-
-      {/* Left Leg */}
-      <group ref={leftLegRef} position={[-0.3, -1.2, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.2, 0.2, 1.0, 8]} />
-          <primitive object={createLegoMaterial('#4169E1')} />
-        </mesh>
-        {/* Foot */}
-        <mesh position={[0, -0.7, 0.1]}>
-          <boxGeometry args={[0.5, 0.2, 0.8]} />
-          <primitive object={createLegoMaterial('#000000')} />
-        </mesh>
-      </group>
-
-      {/* Right Leg */}
-      <group ref={rightLegRef} position={[0.3, -1.2, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.2, 0.2, 1.0, 8]} />
-          <primitive object={createLegoMaterial('#4169E1')} />
-        </mesh>
-        {/* Foot */}
-        <mesh position={[0, -0.7, 0.1]}>
-          <boxGeometry args={[0.5, 0.2, 0.8]} />
-          <primitive object={createLegoMaterial('#000000')} />
-        </mesh>
-      </group>
+      <BlockCharacter
+        bodyRef={bodyRef}
+        headRef={headRef}
+        leftArmRef={leftArmRef}
+        rightArmRef={rightArmRef}
+        leftLegRef={leftLegRef}
+        rightLegRef={rightLegRef}
+      />
     </group>
   );
 };
 
-export default LegoPlayer;
+export default Player;

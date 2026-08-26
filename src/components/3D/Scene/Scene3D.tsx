@@ -15,7 +15,7 @@ import AboutSection from '../Sections/AboutSection';
 import ContactSection from '../Sections/ContactSection';
 
 // Player, camera and input
-import LegoPlayer from '../Player/LegoPlayer';
+import Player from '../Player/Player';
 import CameraController from '../Player/CameraController';
 import PointerControls from '../Controls/PointerControls';
 import SteeringIndicator from '../Player/SteeringIndicator';
@@ -48,7 +48,7 @@ const Scene3D: React.FC = () => {
       <ContactSection position={[SECTIONS.CONTACT.x, 0, SECTIONS.CONTACT.z]} />
 
       {/* Player Character */}
-      <LegoPlayer />
+      <Player />
 
       {/* Ring and arrow showing where he is headed. */}
       <SteeringIndicator />

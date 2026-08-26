@@ -19,8 +19,8 @@ it matters and naive sampling gets it wrong:
      stop and a half down, and the sclera beside them still measures
      rgb(181, 155, 132) after correction. At that size JPEG chroma subsampling
      has eaten the colour: the iris measures neutral grey against its own
-     sclera. It is visibly light and low-saturation; the exact hue is the one
-     value here that is NOT measured, and it is marked as such below.
+     sclera. Asked rather than guessed -- Tim confirmed grey, which is what the
+     measurement pointed at anyway.
 
 Run:  python3 tools/make-avatar-skin.py [out.png]
 """
@@ -43,9 +43,9 @@ HAIR_LIFT    = (0x6B, 0x4E, 0x3C)   # sun-lifted ends, clear in the summer shot
 BROW         = (0x6B, 0x50, 0x39)
 
 EYE_WHITE    = (0xEC, 0xE4, 0xDC)
-EYE_IRIS     = (0x7C, 0x8B, 0x84)   # ** NOT MEASURED ** light grey-green.
-                                    # See the note at the top. Needs Alexandr
-                                    # to confirm; it is one pixel per eye.
+EYE_IRIS     = (0x8A, 0x92, 0x95)   # grey. NOT measured -- see the note at the
+                                    # top; the photographs cannot prove a hue at
+                                    # this size. Confirmed by Tim, 2026-08-26.
 EYE_LINE     = (0x2B, 0x27, 0x24)
 
 MOUTH        = (0xA9, 0x74, 0x69)   # lips, lightened -- at 8px a dark mouth reads as a scowl

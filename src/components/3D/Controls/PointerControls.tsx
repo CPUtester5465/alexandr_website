@@ -58,7 +58,7 @@ const PointerControls: React.FC = () => {
     if (!steer) return;
 
     playerScreen.copy(controlState.playerPosition);
-    playerScreen.y += 1.4; // aim at his chest, not his feet
+    playerScreen.y += 0.9; // aim at his chest, not his hip
     playerScreen.project(camera);
 
     const px = ((playerScreen.x + 1) / 2) * size.width;

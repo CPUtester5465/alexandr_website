@@ -44,17 +44,6 @@ export const createGlowMaterial = (
 };
 
 /**
- * Create Lego-style material with subtle shine
- */
-export const createLegoMaterial = (color: string | number): THREE.MeshPhongMaterial => {
-  return new THREE.MeshPhongMaterial({
-    color,
-    shininess: 30,
-    specular: 0x111111
-  });
-};
-
-/**
  * Animate floating effect
  */
 export const animateFloat = (

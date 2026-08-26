@@ -52,7 +52,8 @@ export const PLAYER_CONFIG = {
   TURN_RATE: 16,
   JUMP_SPEED: 30,
   GRAVITY: 54,
-  HEIGHT: 2.2,
+  /** Hip height. The rig's origin is the hip, and its feet are 12px below. */
+  HEIGHT: 1.38,
   SCALE: 1
 };
 
@@ -69,7 +70,7 @@ export const CAMERA_CONFIG = {
   NEAR: 0.1,
   FAR: 1000,
   OFFSET: new THREE.Vector3(0, 8, 12),
-  LOOK_AT_OFFSET: new THREE.Vector3(0, 2, 0),
+  LOOK_AT_OFFSET: new THREE.Vector3(0, 1.4, 0),
   LERP_SPEED: 0.1,
   /** Orbit distance from the player, and the range a pinch may set. */
   DISTANCE: 14.4,
