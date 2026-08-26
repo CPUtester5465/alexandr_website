@@ -14,9 +14,10 @@ import ArtGallery from '../Sections/ArtGallery';
 import AboutSection from '../Sections/AboutSection';
 import ContactSection from '../Sections/ContactSection';
 
-// Player and camera
+// Player, camera and input
 import LegoPlayer from '../Player/LegoPlayer';
 import CameraController from '../Player/CameraController';
+import PointerControls from '../Controls/PointerControls';
 
 // Import section positions
 import { SECTIONS } from '../../../utils/constants';
@@ -50,6 +51,9 @@ const Scene3D: React.FC = () => {
       
       {/* Camera Controller */}
       <CameraController />
+
+      {/* Tap to walk, double tap to jump, drag to look, pinch to zoom. */}
+      <PointerControls />
     </group>
   );
 };

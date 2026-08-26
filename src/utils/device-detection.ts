@@ -1,57 +1,60 @@
 /**
- * Device detection utilities for mobile, tablet, and desktop devices
+ * What kind of device is this, and what does the visitor want from it.
+ *
+ * The previous version of this file existed to answer one question -- "should
+ * we refuse to show this person the site?" -- and it answered it badly. It
+ * treated `'ontouchstart' in window` as proof of a touchscreen, which is true
+ * in desktop Chromium regardless of hardware and true in jsdom, so any Chromium
+ * window narrower than 768px was classed as a phone and turned away.
+ *
+ * Nothing refuses anybody now. These functions only choose *defaults*: which
+ * control hints to show, and how hard to push the GPU.
  */
 
-export const isMobileDevice = (): boolean => {
-  // Check for mobile user agents
-  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-  const userAgent = navigator.userAgent;
-  
-  // Check user agent
-  const isMobileUserAgent = mobileRegex.test(userAgent);
-  
-  // Check screen size (phones typically < 768px width)
-  const isSmallScreen = window.innerWidth < 768;
-  
-  // Check for touch capability
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  
-  // Check for mobile-specific features
-  const hasMobileFeatures = isMobileUserAgent || (isSmallScreen && isTouchDevice);
-  
-  return hasMobileFeatures;
-};
+/** `matchMedia` is missing in some test and server environments. */
+function media(query: string): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia(query).matches;
+}
 
-export const isTabletDevice = (): boolean => {
-  const tabletRegex = /iPad|Android.*Tablet|Windows.*Touch/i;
-  const userAgent = navigator.userAgent;
-  
-  // Check user agent for tablets
-  const isTabletUserAgent = tabletRegex.test(userAgent);
-  
-  // Check screen size (tablets typically between 768px and 1024px)
-  const isTabletScreen = window.innerWidth >= 768 && window.innerWidth <= 1024;
-  
-  // Check for touch capability
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  
-  return isTabletUserAgent || (isTabletScreen && isTouchDevice);
-};
+/**
+ * True when the main pointer is a finger.
+ *
+ * `(pointer: coarse)` asks the browser about the *primary* input device, which
+ * is the actual question. A laptop with a touchscreen reports `fine`, because
+ * its primary pointer is still the trackpad -- and that is the right answer.
+ */
+export const isTouchPrimary = (): boolean => media('(pointer: coarse)');
 
-export const isDesktopDevice = (): boolean => {
-  return !isMobileDevice() && !isTabletDevice();
-};
+/** True when the device can hover, i.e. there is a real cursor. */
+export const canHover = (): boolean => media('(hover: hover)');
 
-export const getDeviceType = (): 'mobile' | 'tablet' | 'desktop' => {
-  if (isMobileDevice()) return 'mobile';
-  if (isTabletDevice()) return 'tablet';
-  return 'desktop';
-};
+/** Honour the OS-level "reduce motion" setting. */
+export const prefersReducedMotion = (): boolean =>
+  media('(prefers-reduced-motion: reduce)');
 
-export const getScreenSize = () => {
-  return {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    aspectRatio: window.innerWidth / window.innerHeight
-  };
-};
+/** Phone-sized viewport. Used for layout only, never for access. */
+export const isSmallViewport = (): boolean =>
+  typeof window !== 'undefined' && window.innerWidth < 768;
+
+export type InputMode = 'touch' | 'pointer';
+
+export const getInputMode = (): InputMode =>
+  isTouchPrimary() ? 'touch' : 'pointer';
+
+/**
+ * Renderer quality ceiling.
+ *
+ * Device pixel ratio is the single biggest lever on a phone: an iPhone reports
+ * 3, so rendering at native resolution costs nine times the pixels of 1x for a
+ * difference almost nobody can see on a moving 3D scene.
+ */
+export const getMaxPixelRatio = (): number => (isTouchPrimary() ? 1.5 : 2);
+
+export const getScreenSize = () => ({
+  width: window.innerWidth,
+  height: window.innerHeight,
+  aspectRatio: window.innerWidth / window.innerHeight
+});

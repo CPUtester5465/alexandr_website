@@ -1,92 +1,83 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { isMobileDevice, isTabletDevice, isDesktopDevice, getDeviceType } from './device-detection';
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  isTouchPrimary,
+  canHover,
+  prefersReducedMotion,
+  getInputMode,
+  getMaxPixelRatio
+} from './device-detection';
 
 /**
- * These functions decide whether a visitor is allowed to see the site at all
- * (App.tsx swaps the whole app for a "Desktop Experience Required" card when
- * isMobileDevice() is true). Phase 1 removes that gate, and these tests exist
- * so the removal is visible rather than silent.
+ * jsdom implements no media queries at all, so every test here installs its own
+ * matchMedia. That is also the point of the last block: matchMedia genuinely is
+ * absent in some environments, and these functions must not throw when it is.
  */
 
-const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
-const IPAD = 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
-const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0';
+type Matches = Record<string, boolean>;
 
-// jsdom does not define navigator.maxTouchPoints at all, so vi.spyOn has
-// nothing to wrap — these have to be defined outright.
-//
-// jsdom *does* define window.ontouchstart, which matters: the detection treats
-// `'ontouchstart' in window` as proof of a touchscreen, and that is simply not
-// true. It is present in jsdom, and present in desktop Chromium regardless of
-// hardware. The helper therefore controls it explicitly, and one test below
-// pins the consequence.
-function fakeDevice(userAgent: string, width: number, touchPoints: number) {
-  Object.defineProperty(navigator, 'userAgent', { value: userAgent, configurable: true });
-  Object.defineProperty(navigator, 'maxTouchPoints', { value: touchPoints, configurable: true });
-  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
-  if (touchPoints > 0) {
-    Object.defineProperty(window, 'ontouchstart', { value: null, configurable: true });
-  } else {
-    delete (window as unknown as Record<string, unknown>).ontouchstart;
-  }
+function withMedia(matches: Matches) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: matches[query] ?? false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {}
+    })
+  });
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  delete (window as unknown as Record<string, unknown>).matchMedia;
+});
 
-describe('isMobileDevice', () => {
-  it('detects a phone by user agent', () => {
-    fakeDevice(IPHONE, 390, 5);
-    expect(isMobileDevice()).toBe(true);
+describe('isTouchPrimary', () => {
+  it('is true on a phone, where the primary pointer is coarse', () => {
+    withMedia({ '(pointer: coarse)': true });
+    expect(isTouchPrimary()).toBe(true);
   });
 
-  it('detects a narrow touch screen even with an unknown user agent', () => {
-    fakeDevice('Some/Unknown Browser', 400, 5);
-    expect(isMobileDevice()).toBe(true);
-  });
-
-  it('does not flag a narrow desktop window without touch', () => {
-    fakeDevice(MAC, 400, 0);
-    expect(isMobileDevice()).toBe(false);
-  });
-
-  it('flags an iPad, because the regex includes iPad', () => {
-    // Documents current behaviour rather than endorsing it: an iPad is matched
-    // by the *mobile* regex, so today it is blocked from the site as well.
-    fakeDevice(IPAD, 1024, 5);
-    expect(isMobileDevice()).toBe(true);
-  });
-
-  it('calls a narrow desktop window "mobile" as soon as ontouchstart exists', () => {
-    // The bug this pins: a laptop with a touchscreen, or any Chromium window
-    // narrower than 768px, is blocked from the site. maxTouchPoints is 0 here —
-    // the only thing making it "mobile" is a property that proves nothing.
-    fakeDevice(MAC, 400, 0);
-    Object.defineProperty(window, 'ontouchstart', { value: null, configurable: true });
-    expect(isMobileDevice()).toBe(true);
+  it('is false on a touchscreen laptop, whose primary pointer is the trackpad', () => {
+    // The regression this guards: the old detection called any touch-capable
+    // machine a phone and refused to show it the site.
+    withMedia({ '(pointer: coarse)': false, '(hover: hover)': true });
+    expect(isTouchPrimary()).toBe(false);
+    expect(canHover()).toBe(true);
   });
 });
 
-describe('isTabletDevice', () => {
-  it('detects an iPad', () => {
-    fakeDevice(IPAD, 1024, 5);
-    expect(isTabletDevice()).toBe(true);
+describe('prefersReducedMotion', () => {
+  it('follows the OS setting', () => {
+    withMedia({ '(prefers-reduced-motion: reduce)': true });
+    expect(prefersReducedMotion()).toBe(true);
   });
 
-  it('does not flag a phone', () => {
-    fakeDevice(IPHONE, 390, 5);
-    expect(isTabletDevice()).toBe(false);
+  it('defaults to full motion', () => {
+    withMedia({});
+    expect(prefersReducedMotion()).toBe(false);
   });
 });
 
-describe('isDesktopDevice / getDeviceType', () => {
-  it('recognises a laptop', () => {
-    fakeDevice(MAC, 1512, 0);
-    expect(isDesktopDevice()).toBe(true);
-    expect(getDeviceType()).toBe('desktop');
+describe('getInputMode / getMaxPixelRatio', () => {
+  it('caps the pixel ratio harder on touch', () => {
+    withMedia({ '(pointer: coarse)': true });
+    expect(getInputMode()).toBe('touch');
+    expect(getMaxPixelRatio()).toBe(1.5);
   });
 
-  it('classifies a phone as mobile', () => {
-    fakeDevice(IPHONE, 390, 5);
-    expect(getDeviceType()).toBe('mobile');
+  it('allows 2x with a real cursor', () => {
+    withMedia({ '(pointer: coarse)': false });
+    expect(getInputMode()).toBe('pointer');
+    expect(getMaxPixelRatio()).toBe(2);
+  });
+});
+
+describe('when matchMedia does not exist', () => {
+  it('answers false rather than throwing', () => {
+    expect(isTouchPrimary()).toBe(false);
+    expect(canHover()).toBe(false);
+    expect(prefersReducedMotion()).toBe(false);
+    expect(getInputMode()).toBe('pointer');
   });
 });
