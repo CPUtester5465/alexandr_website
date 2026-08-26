@@ -6,6 +6,7 @@ import LoadingScreen from './components/UI/HUD/LoadingScreen';
 import SectionLabel from './components/UI/HUD/SectionLabel';
 import ControlsPanel from './components/UI/Controls/ControlsPanel';
 import LookPad from './components/UI/Controls/LookPad';
+import DoorLabel from './components/UI/HUD/DoorLabel';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -70,6 +71,7 @@ const AppContent: React.FC = () => {
         <div className="pointer-events-auto">
           <SectionLabel />
         </div>
+        <DoorLabel />
         <div className="pointer-events-auto">
           <ControlsPanel isTouch={isTouch} />
         </div>

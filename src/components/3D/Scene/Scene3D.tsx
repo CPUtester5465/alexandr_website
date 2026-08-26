@@ -23,6 +23,7 @@ import SteeringIndicator from '../Player/SteeringIndicator';
 // Import section positions
 import { SECTIONS } from '../../../utils/constants';
 import Dimension from '../World/Dimension';
+import Hub from '../World/Hub';
 
 /**
  * Which world to show.
@@ -31,12 +32,20 @@ import Dimension from '../World/Dimension';
  * old scene rather than replacing it before the hub exists. The old sections
  * are on their way out; this is a viewing arrangement, not an architecture.
  */
-function useWorldMode(): 'legacy' | 'poppy' {
-  const [mode, setMode] = React.useState<'legacy' | 'poppy'>(
-    () => (typeof window !== 'undefined' && window.location.hash === '#poppy' ? 'poppy' : 'legacy')
-  );
+type WorldMode = 'legacy' | 'poppy' | 'hub';
+
+function readMode(): WorldMode {
+  if (typeof window === 'undefined') return 'legacy';
+  const hash = window.location.hash;
+  if (hash === '#poppy') return 'poppy';
+  if (hash === '#hub') return 'hub';
+  return 'legacy';
+}
+
+function useWorldMode(): WorldMode {
+  const [mode, setMode] = React.useState<WorldMode>(readMode);
   React.useEffect(() => {
-    const onHash = () => setMode(window.location.hash === '#poppy' ? 'poppy' : 'legacy');
+    const onHash = () => setMode(readMode());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -58,6 +67,8 @@ const Scene3D: React.FC = () => {
     <group ref={sceneRef}>
       {mode === 'poppy' ? (
         <Dimension />
+      ) : mode === 'hub' ? (
+        <Hub />
       ) : (
         <>
           {/* Environment */}
