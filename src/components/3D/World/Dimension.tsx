@@ -36,7 +36,7 @@ const DOOR_OPENS_AT = 3.6;
  */
 const DOOR_INERT_FOR = 1.4;
 
-const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
+export const ReturnDoor: React.FC<{ at: THREE.Vector3; slug: string }> = ({ at, slug }) => {
   const age = useRef(0);
 
   useFrame((_, delta) => {
