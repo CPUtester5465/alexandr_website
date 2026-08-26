@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { meshVolume, quadCount, BLOCK } from '../../../world/voxel';
 import { generateHub, HUB, Door } from '../../../world/hub';
@@ -8,6 +9,7 @@ import { controlState } from '../../../state/controlState';
 import { PLAYER_CONFIG } from '../../../utils/constants';
 import { setNearestDoor } from '../../../state/hubState';
 import { travelTo, useWorld } from '../../../state/worldState';
+import { useLocale, pick } from '../../../state/locale';
 
 /**
  * The room with fourteen doors.
@@ -34,6 +36,43 @@ const DOOR_CROSSING = 2.6;
 interface GlowProps {
   door: Door;
 }
+
+/**
+ * The name over the door, in the world rather than in the browser.
+ *
+ * Handjet, because it is a multi-script pixel face whose Cyrillic was checked
+ * glyph by glyph rather than taken from a subset listing. troika builds SDF
+ * atlases from a real font file and cannot read woff2, so this points at the
+ * whole .woff -- a different file from the one the DOM uses, for a real reason.
+ *
+ * No emoji: the fallback has no emoji glyphs and they come out as blank boxes.
+ */
+const DoorSign: React.FC<GlowProps> = ({ door }) => {
+  const [locale] = useLocale();
+  const outward = door.facing;
+
+  return (
+    <Text
+      font="/fonts/Handjet.woff"
+      position={[
+        door.position.x - outward.x * BLOCK * 2.4,
+        BLOCK * 4.4,
+        door.position.z - outward.z * BLOCK * 2.4
+      ]}
+      rotation={[0, Math.atan2(-outward.x, -outward.z) + Math.PI, 0]}
+      fontSize={1.15}
+      maxWidth={11}
+      textAlign="center"
+      anchorX="center"
+      anchorY="middle"
+      color={door.colour}
+      outlineWidth={0.045}
+      outlineColor="#1A1410"
+    >
+      {pick(door.title, locale)}
+    </Text>
+  );
+};
 
 const DoorGlow: React.FC<GlowProps> = ({ door }) => {
   const light = useRef<THREE.PointLight>(null);
@@ -147,7 +186,10 @@ const Hub: React.FC = () => {
       />
 
       {hub.doors.map((door) => (
-        <DoorGlow key={door.slug} door={door} />
+        <React.Fragment key={door.slug}>
+          <DoorGlow door={door} />
+          <DoorSign door={door} />
+        </React.Fragment>
       ))}
 
       {/* Enough ambient that the room is never black, and no more -- the doors

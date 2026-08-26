@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNearestDoor } from '../../../state/hubState';
 import { subjectBySlug } from '../../../world/dimensions/subjects';
+import { useLocale, pick } from '../../../state/locale';
 
 /**
  * Names the door he is standing at.
@@ -14,6 +15,7 @@ import { subjectBySlug } from '../../../world/dimensions/subjects';
  * PROVISIONAL STYLING.
  */
 const DoorLabel: React.FC = () => {
+  const [locale] = useLocale();
   const door = useNearestDoor();
   if (!door) return null;
   const subject = door.kind === 'subject' ? subjectBySlug(door.slug) : undefined;
@@ -33,11 +35,14 @@ const DoorLabel: React.FC = () => {
           color: '#EDE6D2'
         }}
       >
+        {/* The name in the world is already the chosen language, so this shows
+            the other one -- a Russian reader sees the English title he might
+            meet elsewhere, and the reverse. */}
         <div style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.01em' }}>
-          {door.title.en}
+          {pick(door.title, locale)}
         </div>
-        <div style={{ fontSize: '13px', opacity: 0.7, marginTop: '2px' }}>
-          {door.title.ru}
+        <div style={{ fontSize: '13px', opacity: 0.62, marginTop: '2px' }}>
+          {pick(door.title, locale === 'en' ? 'ru' : 'en')}
         </div>
         {/* A subject door carries what he actually won. This is the record --
             verified, never softened, never inflated -- and it belongs on the
@@ -47,14 +52,14 @@ const DoorLabel: React.FC = () => {
             {subject.records.map((record) => (
               <div key={record.competition.en} style={{ marginTop: '6px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600 }}>
-                  {record.result.en} · {record.year}
+                  {pick(record.result, locale)} · {record.year}
                 </div>
                 <div style={{ fontSize: '11px', opacity: 0.72, lineHeight: 1.35 }}>
-                  {record.competition.en}
+                  {pick(record.competition, locale)}
                 </div>
                 {record.note && (
                   <div style={{ fontSize: '11px', opacity: 0.6, fontStyle: 'italic' }}>
-                    {record.note.en}
+                    {pick(record.note, locale)}
                   </div>
                 )}
               </div>
@@ -71,7 +76,9 @@ const DoorLabel: React.FC = () => {
             opacity: 0.75
           }}
         >
-          {door.built ? 'Walk through' : 'Not built yet'}
+          {door.built
+            ? pick({ en: 'Walk through', ru: 'Войти' }, locale)
+            : pick({ en: 'Not built yet', ru: 'Ещё не построено' }, locale)}
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ import DoorLabel from './components/UI/HUD/DoorLabel';
 import TravelFade from './components/UI/HUD/TravelFade';
 import WayHome from './components/UI/HUD/WayHome';
 import WorldMap from './components/UI/HUD/WorldMap';
+import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -76,6 +77,9 @@ const AppContent: React.FC = () => {
         </div>
         <DoorLabel />
         <WayHome />
+        <div className="pointer-events-auto">
+          <LocaleToggle />
+        </div>
         <div className="pointer-events-auto">
           <WorldMap />
         </div>
