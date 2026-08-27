@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+await p.goto('http://localhost:3001/');
+await p.waitForTimeout(2500);
+await p.locator('canvas').screenshot({ path: '/tmp/canvas-paper.png' });
+await p.click('text=touch to begin');
+await p.waitForTimeout(1500);
+await p.locator('canvas').screenshot({ path: '/tmp/canvas-dive.png' });
+await p.waitForTimeout(3500);
+await p.locator('canvas').screenshot({ path: '/tmp/canvas-splat.png' });
+await b.close();
+console.log('canvas shots done');

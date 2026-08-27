@@ -26,6 +26,7 @@ import Dimension from '../World/Dimension';
 import SmoothDimension from '../World/SmoothDimension';
 import Hub from '../World/Hub';
 import { useWorld, setWorldImmediately } from '../../../state/worldState';
+import IntroSequence from '../../Intro/IntroSequence';
 
 /**
  * Which world to show.
@@ -65,7 +66,9 @@ const Scene3D: React.FC = () => {
 
   return (
     <group ref={sceneRef}>
-      {mode !== 'hub' && mode !== 'legacy' ? (
+      {mode === 'intro' ? (
+        <IntroSequence />
+      ) : mode !== 'hub' && mode !== 'legacy' ? (
         // The smooth painterly study replaces the poppy dimension's view on
         // this branch; the other seventeen still render the voxel path.
         // The smooth painterly path serves the worlds whose skies have been
@@ -91,17 +94,19 @@ const Scene3D: React.FC = () => {
         <Hub />
       )}
 
-      {/* Player Character */}
-      <Player />
-
-      {/* Ring and arrow showing where he is headed. */}
-      <SteeringIndicator />
-      
-      {/* Camera Controller */}
-      <CameraController />
-
-      {/* Tap to walk, double tap to jump, drag to look, pinch to zoom. */}
-      <PointerControls />
+      {/* The player and his controls exist everywhere EXCEPT the opening
+          shot -- the first walkthrough had the block boy standing proudly on
+          top of the painting mid-dive. The silent-failure lesson repeats: the
+          first gating attempt matched nothing because of trailing whitespace,
+          and python replace does not complain. Verify every patch landed. */}
+      {mode !== 'intro' && (
+        <>
+          <Player />
+          <SteeringIndicator />
+          <CameraController />
+          <PointerControls />
+        </>
+      )}
     </group>
   );
 };

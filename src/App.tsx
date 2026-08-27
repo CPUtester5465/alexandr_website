@@ -17,6 +17,9 @@ import ConsentBanner from './components/UI/ConsentBanner';
 import WorldHint from './components/UI/HUD/WorldHint';
 import SoundToggle from './components/UI/HUD/SoundToggle';
 import { installAudioUnlock } from './state/audio';
+import TitleCard from './components/Intro/TitleCard';
+import SettingsPanel from './components/UI/SettingsPanel';
+import { useUi } from './state/uiState';
 import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
@@ -36,6 +39,8 @@ const AppContent: React.FC = () => {
   const popup = usePopup();
   const { isTouch } = useInputMode();
   const { current: currentWorld } = useWorld();
+  const { hudVisible } = useUi();
+  const inIntro = currentWorld === 'intro';
 
   useKeyboardControls();
 
@@ -78,10 +83,11 @@ const AppContent: React.FC = () => {
         </Suspense>
       </Canvas>
 
-      {/* UI overlay, above the canvas. */}
+      {/* UI overlay, above the canvas. Hidden during the opening shot and by
+          the interface setting -- the gear itself stays. */}
       <div
         className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-        style={{ pointerEvents: 'none' }}
+        style={{ pointerEvents: 'none', display: inIntro || !hudVisible ? 'none' : undefined }}
       >
         {/* The section label narrates the LEGACY scene's zones; in a dimension
             it fires nonsense ("Achievements Zone" over a poppy meadow). */}
@@ -121,7 +127,9 @@ const AppContent: React.FC = () => {
       {/* Covers it again, briefly, when going through a door. */}
       <TravelFade />
 
-      <ConsentBanner />
+      {!inIntro && <ConsentBanner />}
+      {!inIntro && <SettingsPanel />}
+      <TitleCard />
 
       <ContentPopup
         isOpen={popup.isOpen}

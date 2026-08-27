@@ -29,7 +29,10 @@ interface WorldSnapshot {
   transition: TransitionState | null;
 }
 
-let snapshot: WorldSnapshot = { current: 'hub', cameFrom: null, transition: null };
+// First visit with no hash gets the opening shot; a deep link goes straight
+// to its world -- someone sharing #pagoda shares pagoda, not our cinema.
+const entry = typeof window !== 'undefined' && !window.location.hash ? 'intro' : 'hub';
+let snapshot: WorldSnapshot = { current: entry, cameFrom: null, transition: null };
 const listeners = new Set<(s: WorldSnapshot) => void>();
 
 function publish(next: Partial<WorldSnapshot>): void {
