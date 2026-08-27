@@ -100,6 +100,30 @@ export function shrineBell(): void {
   tone(588, 0.02, 0.9, 'triangle', 0.03);
 }
 
+/**
+ * A palette, played. Each hex's hue picks a pentatonic degree, its lightness
+ * the octave -- so every painting owns a phrase, and no phrase can be sour.
+ * Used by the ascent as each world-fragment is strung onto the ribbon.
+ */
+export function palettePhrase(hexes: string[]): void {
+  const scale = [261.6, 293.7, 329.6, 392.0, 440.0]; // C D E G A
+  hexes.slice(0, 3).forEach((hex, i) => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let hue = 0;
+    if (mx !== mn) {
+      if (mx === r) hue = ((g - b) / (mx - mn) + 6) % 6;
+      else if (mx === g) hue = (b - r) / (mx - mn) + 2;
+      else hue = (r - g) / (mx - mn) + 4;
+    }
+    const degree = Math.floor((hue / 6) * scale.length) % scale.length;
+    const octave = (mx + mn) / 2 > 0.55 ? 2 : 1;
+    tone(scale[degree] * octave, i * 0.14, 0.5, 'sine', 0.09);
+  });
+}
+
 /** Planting: earthy thump then a rising sprout. */
 export function plantSound(): void {
   tone(110, 0, 0.25, 'sine', 0.18);

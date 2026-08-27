@@ -110,7 +110,24 @@ const TitleCard: React.FC = () => {
         </div>
       )}
 
-      {(introPhase === 'dive' || introPhase === 'splat') && (
+      {introPhase === 'ascent' && (
+        <p
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: 'calc(env(safe-area-inset-left, 0px) + 18px)',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 18px)',
+            color: 'rgba(26,20,16,0.62)', fontSize: '12px',
+            letterSpacing: '0.08em', margin: 0
+          }}
+        >
+          {pick({
+            en: `this sky exists only today · ${new Date().toLocaleDateString('en-GB')}`,
+            ru: `это небо существует только сегодня · ${new Date().toLocaleDateString('ru-RU')}`
+          }, locale)}
+        </p>
+      )}
+
+      {(introPhase === 'dive' || introPhase === 'splat' || introPhase === 'ascent') && (
         <button
           type="button"
           onClick={() => setIntroPhase('done')}

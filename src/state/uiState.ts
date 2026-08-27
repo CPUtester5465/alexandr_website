@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
  * panel and the opening sequence both talk through.
  */
 
-type IntroPhase = 'paper' | 'dive' | 'splat' | 'done';
+type IntroPhase = 'paper' | 'dive' | 'splat' | 'ascent' | 'done';
 
 interface UiSnapshot {
   hudVisible: boolean;
