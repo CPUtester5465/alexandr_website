@@ -147,6 +147,23 @@ const PointerControls: React.FC = () => {
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
+      // On touch, movement belongs to the floating stick (Mobile Legends
+      // grammar, Tim's spec) and jump to its button; the canvas keeps only
+      // two-finger look/zoom. Single-finger steering stays for the mouse.
+      if (e.pointerType === 'touch') {
+        el.setPointerCapture?.(e.pointerId);
+        pointers.set(e.pointerId, {
+          id: e.pointerId, startX: e.clientX, startY: e.clientY,
+          lastX: e.clientX, lastY: e.clientY, startedAt: performance.now(),
+          moved: false, isRightButton: false, usedForCamera: true
+        });
+        if (pointers.size === 2) {
+          const [a, b] = Array.from(pointers.values());
+          pinchStartDistance = distanceBetween(a, b);
+          pinchStartCameraDistance = controlState.cameraDistance;
+        }
+        return;
+      }
 
       el.setPointerCapture?.(e.pointerId);
       pointers.set(e.pointerId, {

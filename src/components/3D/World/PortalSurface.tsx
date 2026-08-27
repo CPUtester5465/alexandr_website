@@ -119,9 +119,12 @@ const PortalSurface: React.FC<{ door: Door }> = ({ door }) => {
   return (
     <mesh
       position={[
-        door.position.x - inward.x * 1.6,
+        // INWARD of the door anchor. The old minus pushed the plane 1.6 units
+        // outward -- into what used to be the voxel alcove and is now the far
+        // side of the plaster drum, where every portal glowed at a wall.
+        door.position.x + inward.x * 2.2,
         6.4,
-        door.position.z - inward.z * 1.6
+        door.position.z + inward.z * 2.2
       ]}
       rotation={[0, Math.atan2(inward.x, inward.z), 0]}
       material={material}

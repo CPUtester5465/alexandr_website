@@ -13,6 +13,7 @@ import { travelTo, useWorld } from '../../../state/worldState';
 import { useLocale, pick } from '../../../state/locale';
 import PostFX from '../PostFX';
 import PortalSurface from './PortalSurface';
+import HubRoom from './HubRoom';
 import { BLOOM_LAYER } from '../PostFX';
 import { dimensionBySlug } from '../../../world/dimensions/registry';
 
@@ -331,11 +332,10 @@ const Hub: React.FC = () => {
 
   return (
     <group>
-      <mesh
-        geometry={geometry}
-        material={material}
-        position={[-(size / 2) * BLOCK, 0, -(size / 2) * BLOCK]}
-      />
+      {/* The voxel volume still exists in generateHub for door math and the
+          walkable clamp, but the ROOM the visitor sees is architecture now --
+          the block shell was, in Tim's words, a placeholder. */}
+      <HubRoom doors={hub.doors} />
 
       {hub.doors.map((door) => (
         <React.Fragment key={door.slug}>

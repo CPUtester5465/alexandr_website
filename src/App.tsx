@@ -6,6 +6,8 @@ import LoadingScreen from './components/UI/HUD/LoadingScreen';
 import SectionLabel from './components/UI/HUD/SectionLabel';
 import ControlsPanel from './components/UI/Controls/ControlsPanel';
 import LookPad from './components/UI/Controls/LookPad';
+import FloatingMoveStick from './components/UI/Controls/FloatingMoveStick';
+import JumpButton from './components/UI/Controls/JumpButton';
 import DoorLabel from './components/UI/HUD/DoorLabel';
 import TravelFade from './components/UI/HUD/TravelFade';
 import WayHome from './components/UI/HUD/WayHome';
@@ -13,6 +15,8 @@ import WorldMap from './components/UI/HUD/WorldMap';
 import ActivityBadge from './components/UI/HUD/ActivityBadge';
 import ConsentBanner from './components/UI/ConsentBanner';
 import WorldHint from './components/UI/HUD/WorldHint';
+import SoundToggle from './components/UI/HUD/SoundToggle';
+import { installAudioUnlock } from './state/audio';
 import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
@@ -34,6 +38,8 @@ const AppContent: React.FC = () => {
   const { current: currentWorld } = useWorld();
 
   useKeyboardControls();
+
+  React.useEffect(() => installAudioUnlock(), []);
 
   return (
     <div className="h-screen w-screen overflow-hidden relative">
@@ -92,6 +98,9 @@ const AppContent: React.FC = () => {
           <LocaleToggle />
         </div>
         <div className="pointer-events-auto">
+          <SoundToggle />
+        </div>
+        <div className="pointer-events-auto">
           <WorldMap />
         </div>
         <div className="pointer-events-auto">
@@ -99,7 +108,9 @@ const AppContent: React.FC = () => {
         </div>
         {isTouch && (
           <div className="pointer-events-auto">
+            <FloatingMoveStick />
             <LookPad />
+            <JumpButton />
           </div>
         )}
       </div>

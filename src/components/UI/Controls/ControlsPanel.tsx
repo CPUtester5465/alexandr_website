@@ -15,9 +15,9 @@ interface ControlsPanelProps {
 }
 
 const TOUCH_HINTS = [
-  { key: 'Hold', label: 'go that way' },
-  { key: 'Double-tap', label: 'jump' },
-  { key: 'Look pad', label: 'turn the camera' },
+  { key: 'Left side', label: 'touch & drag to move' },
+  { key: 'Right stick', label: 'look around' },
+  { key: 'Jump', label: 'the button' },
   { key: 'Pinch', label: 'zoom' }
 ];
 

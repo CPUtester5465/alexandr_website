@@ -7,6 +7,46 @@
  */
 
 let ctx: AudioContext | null = null;
+let muted = false;
+const muteListeners = new Set<(m: boolean) => void>();
+
+try {
+  muted = typeof window !== 'undefined' && window.localStorage?.getItem('ag.muted') === '1';
+} catch { /* private browsing */ }
+
+export function isMuted(): boolean { return muted; }
+
+export function setMuted(next: boolean): void {
+  muted = next;
+  try { window.localStorage?.setItem('ag.muted', next ? '1' : '0'); } catch { /* ok */ }
+  for (const l of muteListeners) l(next);
+}
+
+export function onMuteChange(l: (m: boolean) => void): () => void {
+  muteListeners.add(l);
+  return () => { muteListeners.delete(l); };
+}
+
+/**
+ * iOS will not start audio unless the context is created AND resumed inside a
+ * real user gesture. Our sounds fire from the frame loop (walking through a
+ * seed is not a gesture), so on mobile nothing ever played -- Tim's report.
+ * This one-time unlock hooks the first touch/click anywhere, resumes the
+ * context, and removes itself.
+ */
+export function installAudioUnlock(): void {
+  if (typeof window === 'undefined') return;
+  const unlock = () => {
+    const c = context();
+    if (c && c.state !== 'running') void c.resume();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('touchend', unlock);
+    window.removeEventListener('keydown', unlock);
+  };
+  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('touchend', unlock, { passive: true });
+  window.addEventListener('keydown', unlock);
+}
 
 function context(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -25,8 +65,9 @@ function tone(
   frequency: number, start: number, duration: number,
   type: OscillatorType, peak: number
 ): void {
+  if (muted) return;
   const c = context();
-  if (!c) return;
+  if (!c || c.state !== 'running') return;
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.type = type;
