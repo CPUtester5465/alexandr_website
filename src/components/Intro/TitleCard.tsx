@@ -50,7 +50,30 @@ const TitleCard: React.FC = () => {
 
       {introPhase === 'paper' && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-end"
-             style={{ paddingBottom: '11vh', background: 'radial-gradient(ellipse at center, transparent 40%, rgba(11,9,8,0.55) 100%)' }}>
+             style={{ paddingBottom: '10vh', background: 'radial-gradient(ellipse at center, transparent 40%, rgba(11,9,8,0.55) 100%)' }}>
+          <style>{`
+            @keyframes petalFall {
+              0%   { transform: translate(0, -8vh) rotate(0deg); opacity: 0; }
+              12%  { opacity: 0.85; }
+              100% { transform: translate(var(--sway), 108vh) rotate(var(--spin)); opacity: 0; }
+            }
+          `}</style>
+          {/* Petals shed from the painting, drifting down the whole card. */}
+          {Array.from({ length: 10 }).map((_, i) => (
+            <span key={i} aria-hidden style={{
+              position: 'absolute',
+              left: `${7 + (i * 137) % 86}%`,
+              top: 0,
+              width: `${9 + (i * 53) % 8}px`,
+              height: `${12 + (i * 31) % 9}px`,
+              borderRadius: '60% 40% 55% 45%',
+              background: i % 3 === 0 ? '#B33F3A' : i % 3 === 1 ? '#8A2E32' : '#C4784D',
+              ['--sway' as string]: `${((i * 89) % 90) - 45}px`,
+              ['--spin' as string]: `${((i * 71) % 300) - 150}deg`,
+              animation: `petalFall ${11 + (i * 47) % 9}s linear ${-(i * 1.7)}s infinite`,
+              pointerEvents: 'none'
+            }} />
+          ))}
           <h1 style={{
             fontFamily: "'Handjet', monospace", fontWeight: 600,
             fontSize: 'clamp(34px, 7vw, 76px)', letterSpacing: '0.04em',
@@ -58,11 +81,20 @@ const TitleCard: React.FC = () => {
           }}>
             {pick({ en: 'Alexandr Goriainov', ru: 'Александр Горяйнов' }, locale)}
           </h1>
+          <div aria-hidden style={{
+            width: '54px', height: '2px', background: 'rgba(244,239,228,0.5)', margin: '14px 0'
+          }} />
           <p style={{
             color: 'rgba(244,239,228,0.85)', fontSize: '14px',
-            letterSpacing: '0.14em', textTransform: 'uppercase', margin: '10px 0 26px'
+            letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0
           }}>
             {pick({ en: 'worlds made of paintings', ru: 'миры, сделанные из картин' }, locale)}
+          </p>
+          <p style={{
+            color: 'rgba(244,239,228,0.55)', fontSize: '12px',
+            letterSpacing: '0.1em', margin: '6px 0 26px'
+          }}>
+            {pick({ en: '18 doors · painted by a boy from Kursk', ru: '18 дверей · нарисовано мальчиком из Курска' }, locale)}
           </p>
           <button
             type="button"

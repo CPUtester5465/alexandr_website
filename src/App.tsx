@@ -15,12 +15,10 @@ import WorldMap from './components/UI/HUD/WorldMap';
 import ActivityBadge from './components/UI/HUD/ActivityBadge';
 import ConsentBanner from './components/UI/ConsentBanner';
 import WorldHint from './components/UI/HUD/WorldHint';
-import SoundToggle from './components/UI/HUD/SoundToggle';
 import { installAudioUnlock } from './state/audio';
 import TitleCard from './components/Intro/TitleCard';
 import SettingsPanel from './components/UI/SettingsPanel';
 import { useUi } from './state/uiState';
-import LocaleToggle from './components/UI/HUD/LocaleToggle';
 import ContentPopup from './components/UI/Popups/ContentPopup';
 
 // 3D Components
@@ -101,12 +99,6 @@ const AppContent: React.FC = () => {
         <ActivityBadge />
         <WorldHint />
         <div className="pointer-events-auto">
-          <LocaleToggle />
-        </div>
-        <div className="pointer-events-auto">
-          <SoundToggle />
-        </div>
-        <div className="pointer-events-auto">
           <WorldMap />
         </div>
         <div className="pointer-events-auto">
@@ -128,7 +120,7 @@ const AppContent: React.FC = () => {
       <TravelFade />
 
       {!inIntro && <ConsentBanner />}
-      {!inIntro && <SettingsPanel />}
+      <SettingsPanel />
       <TitleCard />
 
       <ContentPopup

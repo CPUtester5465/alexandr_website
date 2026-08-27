@@ -46,17 +46,16 @@ const SettingsPanel: React.FC = () => {
         onClick={() => setOpen((o) => !o)}
         className="fixed z-40"
         style={{
-          left: 'calc(env(safe-area-inset-left, 0px) + 166px)',
+          left: 'calc(env(safe-area-inset-left, 0px) + 16px)',
           top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
           width: '40px', height: '40px', borderRadius: '999px',
           background: 'rgba(26,20,16,0.72)', color: '#EDE6D2',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             strokeWidth="1.8" aria-hidden>
-          <circle cx="12" cy="12" r="3.2" />
-          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" />
+        {/* an actual cog: eight teeth on a ring, hole in the middle */}
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M10.9 2h2.2l.5 2.4c.6.15 1.17.39 1.7.7l2.06-1.33 1.56 1.55L17.6 7.4c.3.53.55 1.1.7 1.7l2.4.5v2.2l-2.4.5c-.15.6-.4 1.17-.7 1.7l1.32 2.06-1.56 1.56-2.05-1.33c-.53.3-1.1.55-1.7.7l-.5 2.41h-2.2l-.5-2.4a7 7 0 0 1-1.7-.7L6.4 17.6l-1.56-1.55 1.33-2.06a7 7 0 0 1-.7-1.7L3 11.9V9.7l2.46-.5c.15-.6.4-1.17.7-1.7L4.85 5.44 6.4 3.88l2.06 1.33c.53-.31 1.1-.55 1.7-.7L10.9 2zm1.1 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" />
         </svg>
       </button>
 

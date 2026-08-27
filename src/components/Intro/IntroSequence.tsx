@@ -124,7 +124,10 @@ const IntroSequence: React.FC = () => {
     const t = clockRef.current;
 
     if (phaseRef.current === 'paper') {
-      camera.position.set(0, 0, 10.4);
+      // The card is alive, not a poster: the paint breathes a few millimetres
+      // of relief and the camera sways as if the sheet were held in hands.
+      material.uniforms.uAmount.value = 0.10 + 0.07 * Math.sin(t * 0.55);
+      camera.position.set(Math.sin(t * 0.21) * 0.35, Math.sin(t * 0.17) * 0.22, 10.4);
       camera.lookAt(0, 0, 0);
       wipe.value = 0;
       gl.render(scene, camera);

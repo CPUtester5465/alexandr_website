@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ args: ['--use-angle=metal','--enable-gpu'] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+p.on('pageerror', (e) => console.log('[ERR]', String(e).slice(0,200)));
+await p.goto('https://alexandrgoriainov.com/');
+await p.waitForTimeout(3000);
+await p.screenshot({ path: '/tmp/prod-i1.png' });
+await p.click('text=touch to begin');
+await p.waitForTimeout(2000);
+await p.screenshot({ path: '/tmp/prod-i2.png' });
+await p.waitForTimeout(4500);
+await p.screenshot({ path: '/tmp/prod-i3.png' });
+await b.close(); console.log('prod intro walked');
